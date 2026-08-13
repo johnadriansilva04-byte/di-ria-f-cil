@@ -25,15 +25,22 @@ export function AuthTelefone() {
     try {
       const email = phoneToEmail(digits);
       if (mode === "criar") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { telefone: digits } },
+          options: { 
+            data: { telefone: digits },
+            emailConfirm: false
+          },
         });
         if (error) throw error;
+        // Login automático após criar conta
+        const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+        if (loginError) throw loginError;
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
       }
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Não deu para entrar.";
       if (/already registered|already been registered/i.test(msg)) {
