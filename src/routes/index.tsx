@@ -29,7 +29,7 @@ type Entry = {
   label: string;
   kind: Kind;
   amount: number;
-  detail?: string;
+  detail?: string | undefined;
 };
 
 const STORAGE_KEY = "caixa-do-dia-v1";
