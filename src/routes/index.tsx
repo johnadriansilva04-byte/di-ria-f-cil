@@ -1,6 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownCircle, ArrowUpCircle, Trash2, Wallet } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, LogOut, Trash2, Wallet } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { AuthTelefone } from "@/components/AuthTelefone";
+import {
+  brl,
+  deleteEntry,
+  fetchEntries,
+  fetchPerfil,
+  formatDate,
+  insertEntry,
+  maskPhone,
+  savePerfil,
+  toNumber,
+  type Entry,
+  type Kind,
+} from "@/lib/caixa";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -21,37 +37,42 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Kind = "entrada" | "saida";
-
-type Entry = {
-  id: string;
-  date: string;
-  label: string;
-  kind: Kind;
-  amount: number;
-  detail?: string | undefined;
-};
-
-const STORAGE_KEY = "caixa-do-dia-v1";
-
-const brl = (v: number) =>
-  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
-
-const today = () => new Date().toISOString().slice(0, 10);
-
-const formatDate = (iso: string) => {
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-};
-
-const toNumber = (v: string) => {
-  const n = parseFloat(v.replace(",", "."));
-  return Number.isFinite(n) ? n : 0;
-};
-
 function Index() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      setChecking(false);
+    });
+    void supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setChecking(false);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  if (checking) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-muted-foreground">Carregando…</p>
+      </main>
+    );
+  }
+
+  if (!session) return <AuthTelefone />;
+
+  return <Caixa session={session} />;
+}
+
+function Caixa({ session }: { session: Session }) {
+  const userId = session.user.id;
+  const telefone = (session.user.user_metadata?.["telefone"] as string | undefined) ?? "";
+
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
   const [kind, setKind] = useState<Kind>("entrada");
   const [label, setLabel] = useState("");
@@ -61,24 +82,34 @@ function Index() {
   const [expense, setExpense] = useState("");
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { entries?: Entry[]; daily?: string; hourRate?: string };
-        if (parsed.entries) setEntries(parsed.entries);
-        if (parsed.daily) setDaily(parsed.daily);
-        if (parsed.hourRate) setHourRate(parsed.hourRate);
+    let alive = true;
+    void (async () => {
+      try {
+        const [list, perfil] = await Promise.all([fetchEntries(), fetchPerfil(userId)]);
+        if (!alive) return;
+        setEntries(list);
+        if (perfil) {
+          setDaily(String(perfil.diaria));
+          if (perfil.valorHora > 0) setHourRate(String(perfil.valorHora));
+        }
+      } catch (e) {
+        if (alive) setErro(e instanceof Error ? e.message : "Não deu para carregar.");
+      } finally {
+        if (alive) setLoaded(true);
       }
-    } catch {
-      /* ignora dados inválidos */
-    }
-    setLoaded(true);
-  }, []);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (!loaded) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries, daily, hourRate }));
-  }, [entries, daily, hourRate, loaded]);
+    const t = setTimeout(() => {
+      void savePerfil(userId, toNumber(daily), toNumber(hourRate)).catch(() => undefined);
+    }, 700);
+    return () => clearTimeout(t);
+  }, [daily, hourRate, loaded, userId]);
 
   const extras = toNumber(hours) * toNumber(hourRate);
   const entradaTotal = toNumber(daily) + extras;
@@ -89,33 +120,58 @@ function Index() {
     return { inc, out, saldo: inc - out };
   }, [entries]);
 
-  const add = () => {
+  const add = async () => {
     const amount = kind === "entrada" ? entradaTotal : toNumber(expense);
     if (amount <= 0) return;
     const detail =
       kind === "entrada" && extras > 0
         ? `Diária ${brl(toNumber(daily))} + ${hours}h x ${brl(toNumber(hourRate))}`
         : undefined;
-    setEntries((prev) => [
-      {
-        id: crypto.randomUUID(),
-        date: today(),
+    try {
+      setErro(null);
+      const entry = await insertEntry({
+        userId,
         label: label.trim() || (kind === "entrada" ? "Diária" : "Gasto"),
         kind,
         amount,
         detail,
-      },
-      ...prev,
-    ]);
-    setLabel("");
-    setHours("");
-    setExpense("");
+      });
+      setEntries((prev) => [entry, ...prev]);
+      setLabel("");
+      setHours("");
+      setExpense("");
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não deu para salvar.");
+    }
+  };
+
+  const remove = async (id: string) => {
+    const before = entries;
+    setEntries((prev) => prev.filter((x) => x.id !== id));
+    try {
+      await deleteEntry(id);
+    } catch (e) {
+      setEntries(before);
+      setErro(e instanceof Error ? e.message : "Não deu para apagar.");
+    }
   };
 
   return (
     <main className="flex min-h-screen justify-center px-4 py-8 sm:py-12">
       <div className="w-full max-w-xl">
         <header className="mb-7 text-center">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">
+              {telefone ? maskPhone(telefone) : "Minha conta"}
+            </span>
+            <button
+              type="button"
+              onClick={() => void supabase.auth.signOut()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <LogOut className="size-3.5" /> Sair
+            </button>
+          </div>
           <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
             <Wallet className="size-6" />
           </div>
@@ -125,6 +181,7 @@ function Index() {
           <p className="mt-1 text-sm text-muted-foreground">
             Anote o que entrou e o que saiu. A data é automática.
           </p>
+          {erro ? <p className="mt-2 text-sm font-medium text-expense">{erro}</p> : null}
         </header>
 
         {/* Saldo */}
@@ -246,7 +303,7 @@ function Index() {
 
             <button
               type="button"
-              onClick={add}
+              onClick={() => void add()}
               className={`w-full rounded-xl px-4 py-4 text-base font-bold transition-transform active:scale-[0.99] ${
                 kind === "entrada"
                   ? "bg-income text-income-foreground"
@@ -267,7 +324,9 @@ function Index() {
             <span className="text-xs text-muted-foreground">{entries.length} registro(s)</span>
           </div>
 
-          {entries.length === 0 ? (
+          {!loaded ? (
+            <p className="px-5 py-10 text-center text-sm text-muted-foreground">Carregando…</p>
+          ) : entries.length === 0 ? (
             <p className="px-5 py-10 text-center text-sm text-muted-foreground">
               Nenhum lançamento ainda. Comece registrando sua diária.
             </p>
@@ -292,7 +351,7 @@ function Index() {
                   <button
                     type="button"
                     aria-label={`Apagar ${e.label}`}
-                    onClick={() => setEntries((prev) => prev.filter((x) => x.id !== e.id))}
+                    onClick={() => void remove(e.id)}
                     className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-expense"
                   >
                     <Trash2 className="size-4" />
@@ -315,7 +374,7 @@ function Index() {
         </section>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Seus dados ficam salvos neste aparelho.
+          Seus dados ficam salvos na sua conta.
         </p>
       </div>
     </main>
