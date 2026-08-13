@@ -14,7 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      lancamentos: {
+        Row: {
+          created_at: string
+          data: string
+          descricao: string
+          detalhe: string | null
+          id: string
+          tipo: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          data?: string
+          descricao: string
+          detalhe?: string | null
+          id?: string
+          tipo: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          descricao?: string
+          detalhe?: string | null
+          id?: string
+          tipo?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: []
+      }
+      perfis: {
+        Row: {
+          created_at: string
+          diaria: number
+          id: string
+          telefone: string | null
+          valor_hora: number
+        }
+        Insert: {
+          created_at?: string
+          diaria?: number
+          id: string
+          telefone?: string | null
+          valor_hora?: number
+        }
+        Update: {
+          created_at?: string
+          diaria?: number
+          id?: string
+          telefone?: string | null
+          valor_hora?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
