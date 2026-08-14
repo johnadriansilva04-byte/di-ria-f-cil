@@ -54,8 +54,8 @@ export function AuthTelefone() {
         setErro("Conta não confirmada. Entre em contato com o suporte.");
       } else if (/User already registered/i.test(msg)) {
         setErro("Esse telefone já tem conta. Use “Entrar”.");
-      } else if (/signup_disabled/i.test(msg)) {
-        setErro("Cadastro desabilitado. Entre em contato com o suporte.");
+      } else if (/signup_disabled|Signups not allowed/i.test(msg)) {
+        setErro("Cadastro desabilitado no sistema. Entre em contato com o suporte.");
       } else if (/email address/i.test(msg) && /invalid/i.test(msg)) {
         setErro("Telefone inválido. Verifique o número digitado.");
       } else if (/password/i.test(msg) && /too short/i.test(msg)) {
