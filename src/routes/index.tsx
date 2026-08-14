@@ -93,7 +93,9 @@ function Caixa({ session }: { session: Session }) {
           if (perfil.valorHora > 0) setHourRate(String(perfil.valorHora));
         }
       } catch (e) {
-        if (alive) setErro(e instanceof Error ? e.message : "Não deu para carregar.");
+        const msg = e instanceof Error ? e.message : "Erro desconhecido";
+        console.error("Erro ao carregar dados:", msg);
+        if (alive) setErro("Erro ao carregar dados. Tente novamente.");
       } finally {
         if (alive) setLoaded(true);
       }
@@ -141,7 +143,9 @@ function Caixa({ session }: { session: Session }) {
       setHours("");
       setExpense("");
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não deu para salvar.");
+      const msg = e instanceof Error ? e.message : "Erro desconhecido";
+      console.error("Erro ao salvar lançamento:", msg);
+      setErro("Erro ao salvar lançamento. Tente novamente.");
     }
   };
 
@@ -151,8 +155,10 @@ function Caixa({ session }: { session: Session }) {
     try {
       await deleteEntry(id);
     } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro desconhecido";
+      console.error("Erro ao apagar lançamento:", msg);
       setEntries(before);
-      setErro(e instanceof Error ? e.message : "Não deu para apagar.");
+      setErro("Erro ao apagar lançamento. Tente novamente.");
     }
   };
 
