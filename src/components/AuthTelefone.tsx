@@ -34,9 +34,13 @@ export function AuthTelefone() {
           },
         });
         if (error) throw error;
-        // Login automático após criar conta
-        const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
-        if (loginError) throw loginError;
+        // Login automático após criar conta (só se tiver sessão)
+        if (data.session) {
+          // Já está logado, não precisa fazer login novamente
+        } else {
+          const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+          if (loginError) throw loginError;
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
