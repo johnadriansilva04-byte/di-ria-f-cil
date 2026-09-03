@@ -20,6 +20,7 @@ GRANT ALL ON public.lancamentos TO service_role;
 
 -- RLS para lancamentos
 ALTER TABLE public.lancamentos ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Usuario gerencia seus lancamentos" ON public.lancamentos;
 CREATE POLICY "Usuario gerencia seus lancamentos" ON public.lancamentos FOR ALL TO authenticated 
 USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
@@ -41,6 +42,7 @@ GRANT ALL ON public.perfis TO service_role;
 
 -- RLS para perfis
 ALTER TABLE public.perfis ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Usuario gerencia seu perfil" ON public.perfis;
 CREATE POLICY "Usuario gerencia seu perfil" ON public.perfis FOR ALL TO authenticated 
 USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
