@@ -91,7 +91,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Registre diárias, horas extras e gastos do dia. Soma automática e data preenchida sozinha.",
       },
-      { name: "theme-color", content: "#12261f" },
+      { name: "theme-color", content: "#12131a" },
       { property: "og:title", content: "Caixa do Dia" },
       { property: "og:description", content: "Controle simples de entrada e saída de dinheiro." },
       { property: "og:type", content: "website" },

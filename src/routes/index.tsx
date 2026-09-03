@@ -44,9 +44,6 @@ function InstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
-    const hasShownPrompt = localStorage.getItem("pwa-install-prompt-shown");
-    if (hasShownPrompt) return;
-
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -68,12 +65,10 @@ function InstallPrompt() {
     }
     setDeferredPrompt(null);
     setShowPrompt(false);
-    localStorage.setItem("pwa-install-prompt-shown", "true");
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem("pwa-install-prompt-shown", "true");
   };
 
   if (!showPrompt || !deferredPrompt) return null;
