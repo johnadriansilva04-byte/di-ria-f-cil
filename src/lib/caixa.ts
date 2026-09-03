@@ -128,7 +128,7 @@ const toEntry = (r: Row): Entry => ({
   listaId: r.lista_id ?? null,
 });
 
-export async function fetchEntries(listaId?: string | null): Promise<Entry[]> {
+export async function fetchEntries(listaId?: string | null, isFirstList?: boolean): Promise<Entry[]> {
   let query = supabase
     .from("lancamentos")
     .select("id, data, descricao, tipo, valor, detalhe, lista_id")
@@ -139,8 +139,13 @@ export async function fetchEntries(listaId?: string | null): Promise<Entry[]> {
     // Fetch entries with no lista_id (legacy/default)
     query = query.is("lista_id", null);
   } else if (listaId !== undefined) {
-    // Fetch entries for a specific list
-    query = query.eq("lista_id", listaId);
+    // Fetch entries for a specific list, also include legacy entries (lista_id IS NULL)
+    // when this is the first/default list
+    if (isFirstList) {
+      query = query.or(`lista_id.eq.${listaId},lista_id.is.null`);
+    } else {
+      query = query.eq("lista_id", listaId);
+    }
   }
 
   const { data, error } = await query;

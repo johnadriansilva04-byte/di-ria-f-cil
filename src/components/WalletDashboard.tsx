@@ -25,6 +25,7 @@ interface WalletDashboardProps {
   userId: string;
   perfil: { diaria: number; valorHora: number } | null;
   onError: (msg: string) => void;
+  isFirstList?: boolean;
 }
 
 export function WalletDashboard({
@@ -32,6 +33,7 @@ export function WalletDashboard({
   userId,
   perfil,
   onError,
+  isFirstList,
 }: WalletDashboardProps) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -49,7 +51,7 @@ export function WalletDashboard({
   const loadEntries = useCallback(async () => {
     setLoaded(false);
     try {
-      const data = await fetchEntries(list.id);
+      const data = await fetchEntries(list.id, isFirstList);
       setEntries(data);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro desconhecido";

@@ -309,6 +309,7 @@ function Dashboard({ session }: { session: Session }) {
               userId={userId}
               perfil={perfil}
               onError={setErro}
+              isFirstList={activeList.id === lists[0]?.id}
             />
           ) : (
             <div className="flex h-full items-center justify-center">
