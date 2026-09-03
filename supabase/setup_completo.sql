@@ -65,5 +65,8 @@ CREATE TRIGGER on_auth_user_created
 AFTER INSERT ON auth.users
 FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Adicionar coluna lista_id para suporte a múltiplas carteiras
+ALTER TABLE public.lancamentos ADD COLUMN IF NOT EXISTS lista_id UUID NULL;
+
 -- Revogar permissão de execução da função por segurança
 REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon, authenticated, PUBLIC;
