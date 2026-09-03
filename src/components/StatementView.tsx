@@ -25,8 +25,8 @@ export function StatementView({
 }: StatementViewProps) {
   const handleDelete = async (entry: Entry) => {
     try {
-      onDelete(entry.id);
       await deleteEntry(entry.id);
+      onDelete(entry.id);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro desconhecido";
       console.error("Erro ao apagar lançamento:", msg);
