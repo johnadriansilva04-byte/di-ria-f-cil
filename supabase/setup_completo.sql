@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.lancamentos (
   tipo TEXT NOT NULL CHECK (tipo IN ('entrada','saida')),
   valor NUMERIC(12,2) NOT NULL CHECK (valor > 0),
   detalhe TEXT,
+  lista_id UUID,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 

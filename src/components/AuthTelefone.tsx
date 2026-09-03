@@ -28,39 +28,42 @@ export function AuthTelefone() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { 
+          options: {
             data: { telefone: digits },
-            emailConfirm: false
           },
         });
         if (error) throw error;
-        // Login automático após criar conta (só se tiver sessão)
         if (data.session) {
-          // Já está logado, não precisa fazer login novamente
+          // Already logged in
         } else {
-          const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+          const { error: loginError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
           if (loginError) throw loginError;
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
         if (error) throw error;
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Não deu para entrar.";
-      // Mostrar erro original para debug
       console.error("Erro original do Supabase:", msg);
-      setErro(msg); // Mostrar erro original em inglês
+      setErro(msg);
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-sm">
         <header className="mb-7 text-center">
-          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-            <Wallet className="size-6" />
+          <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Wallet className="size-5" />
           </div>
           <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight">
             Caixa do Dia
@@ -70,11 +73,8 @@ export function AuthTelefone() {
           </p>
         </header>
 
-        <section
-          className="rounded-3xl border border-border bg-card p-5 sm:p-6"
-          style={{ boxShadow: "var(--shadow-soft)" }}
-        >
-          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-secondary p-1.5">
+        <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-secondary p-1">
             {(["entrar", "criar"] as const).map((m) => (
               <button
                 key={m}
@@ -83,7 +83,7 @@ export function AuthTelefone() {
                   setMode(m);
                   setErro(null);
                 }}
-                className={`rounded-xl px-3 py-3 text-sm font-semibold transition-colors ${
+                className={`rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${
                   mode === m
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
@@ -102,45 +102,49 @@ export function AuthTelefone() {
             }}
           >
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                 Telefone
               </span>
-              <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
-                <Phone className="size-4 text-muted-foreground" />
+              <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring/30">
+                <Phone className="size-4 text-muted-foreground/50" />
                 <input
                   value={maskPhone(phone)}
                   onChange={(e) => setPhone(e.target.value)}
                   inputMode="tel"
                   autoComplete="tel"
                   placeholder="(11) 90000-0000"
-                  className="w-full bg-transparent py-3 text-base tabular-nums outline-none placeholder:text-muted-foreground/70"
+                  className="w-full bg-transparent py-2.5 text-sm tabular-nums outline-none placeholder:text-muted-foreground/50"
                 />
               </div>
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                 Senha
               </span>
-              <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
-                <Lock className="size-4 text-muted-foreground" />
+              <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring/30">
+                <Lock className="size-4 text-muted-foreground/50" />
                 <input
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   type="password"
-                  autoComplete={mode === "criar" ? "new-password" : "current-password"}
+                  autoComplete={
+                    mode === "criar" ? "new-password" : "current-password"
+                  }
                   placeholder="Mínimo 6 caracteres"
-                  className="w-full bg-transparent py-3 text-base outline-none placeholder:text-muted-foreground/70"
+                  className="w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground/50"
                 />
               </div>
             </label>
 
-            {erro ? <p className="text-sm font-medium text-expense">{erro}</p> : null}
+            {erro ? (
+              <p className="text-sm font-medium text-expense">{erro}</p>
+            ) : null}
 
             <button
               type="submit"
               disabled={busy}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-4 text-base font-bold text-primary-foreground transition-transform active:scale-[0.99] disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-transform active:scale-[0.99] disabled:opacity-60"
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : null}
               {mode === "entrar" ? "Entrar" : "Criar minha conta"}
@@ -148,8 +152,9 @@ export function AuthTelefone() {
           </form>
         </section>
 
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          Seus lançamentos ficam salvos na sua conta e aparecem em qualquer aparelho.
+        <p className="mt-6 text-center text-xs text-muted-foreground/60">
+          Seus lançamentos ficam salvos na sua conta e aparecem em qualquer
+          aparelho.
         </p>
       </div>
     </main>

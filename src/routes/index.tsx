@@ -1,50 +1,50 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowDownCircle, ArrowUpCircle, LogOut, Trash2, Wallet, Download, X } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Download, X, PanelLeftOpen, PanelLeftClose } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthTelefone } from "@/components/AuthTelefone";
+import { WalletSidebar } from "@/components/WalletSidebar";
+import { WalletDashboard } from "@/components/WalletDashboard";
 import {
-  brl,
-  deleteEntry,
-  fetchEntries,
+  fetchWalletLists,
+  getActiveListId,
+  setActiveListId,
   fetchPerfil,
-  formatDate,
-  insertEntry,
-  maskPhone,
-  savePerfil,
   toNumber,
-  type Entry,
-  type Kind,
+  savePerfil,
+  maskPhone,
+  createWalletList,
+  type WalletList,
 } from "@/lib/caixa";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Caixa do Dia | Diária, horas extras e gastos" },
+      { title: "Caixa do Dia | Controle financeiro" },
       {
         name: "description",
         content:
-          "Anote quanto recebeu no dia, horas extras e gastos. A data entra automática e o total soma sozinho.",
+          "Dashboard financeiro modular. Controle seus gastos e recebimentos em listas independentes.",
       },
       { property: "og:title", content: "Caixa do Dia" },
       {
         property: "og:description",
-        content: "Controle de diária, horas extras e gastos em uma tela só.",
+        content: "Controle financeiro modular e profissional.",
       },
     ],
   }),
   component: Index,
 });
 
-// Componente de prompt de instalação PWA
+// ── PWA Install Prompt ───────────────────────────────────────────────
+
 function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
-    // Verificar se já mostrou o prompt antes
-    const hasShownPrompt = localStorage.getItem('pwa-install-prompt-shown');
+    const hasShownPrompt = localStorage.getItem("pwa-install-prompt-shown");
     if (hasShownPrompt) return;
 
     const handleBeforeInstall = (e: Event) => {
@@ -53,60 +53,56 @@ function InstallPrompt() {
       setShowPrompt(true);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
     };
   }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
-
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
-      console.log('PWA instalado com sucesso');
+    if (outcome === "accepted") {
+      console.log("PWA instalado com sucesso");
     }
-    
     setDeferredPrompt(null);
     setShowPrompt(false);
-    localStorage.setItem('pwa-install-prompt-shown', 'true');
+    localStorage.setItem("pwa-install-prompt-shown", "true");
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem('pwa-install-prompt-shown', 'true');
+    localStorage.setItem("pwa-install-prompt-shown", "true");
   };
 
   if (!showPrompt || !deferredPrompt) return null;
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 sm:left-auto sm:right-4 sm:w-80">
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-lg">
+      <div className="rounded-xl border border-border bg-card p-4 shadow-lg">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
-              <Download className="size-5" />
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Download className="size-4" />
             </div>
             <div>
               <p className="text-sm font-semibold">Instalar App</p>
               <p className="text-xs text-muted-foreground">
-                Adicione à tela inicial para acesso rápido
+                Acesso rápido na tela inicial
               </p>
             </div>
           </div>
           <button
             onClick={handleDismiss}
-            className="rounded-lg p-1 text-muted-foreground hover:bg-secondary"
+            className="rounded-md p-1 text-muted-foreground hover:bg-secondary"
           >
             <X className="size-4" />
           </button>
         </div>
         <button
           onClick={handleInstall}
-          className="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          className="mt-3 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
         >
           Instalar agora
         </button>
@@ -114,6 +110,8 @@ function InstallPrompt() {
     </div>
   );
 }
+
+// ── Auth gate ────────────────────────────────────────────────────────
 
 function Index() {
   const [session, setSession] = useState<Session | null>(null);
@@ -133,7 +131,7 @@ function Index() {
 
   if (checking) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
+      <main className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">Carregando…</p>
       </main>
     );
@@ -143,340 +141,186 @@ function Index() {
 
   return (
     <>
-      <Caixa session={session} />
+      <Dashboard session={session} />
       <InstallPrompt />
     </>
   );
 }
 
-function Caixa({ session }: { session: Session }) {
+// ── Main dashboard ───────────────────────────────────────────────────
+
+function Dashboard({ session }: { session: Session }) {
   const userId = session.user.id;
   const telefone = (session.user.user_metadata?.["telefone"] as string | undefined) ?? "";
 
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [lists, setLists] = useState<WalletList[]>([]);
+  const [activeListId, setActiveListIdState] = useState<string | null>(null);
+  const [perfil, setPerfil] = useState<{ diaria: number; valorHora: number } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  const [kind, setKind] = useState<Kind>("entrada");
-  const [label, setLabel] = useState("");
-  const [daily, setDaily] = useState("130");
-  const [hours, setHours] = useState("");
-  const [hourRate, setHourRate] = useState("");
-  const [expense, setExpense] = useState("");
+  // Load wallet lists
+  const loadLists = useCallback(() => {
+    const loaded = fetchWalletLists();
+    setLists(loaded);
+
+    // If no lists exist, create a default one
+    if (loaded.length === 0) {
+      const defaultList = createWalletList("Meu Trabalho");
+      setLists([defaultList]);
+      setActiveListId(defaultList.id);
+      setActiveListIdState(defaultList.id);
+      return;
+    }
+
+    // Restore active list or select first
+    const savedActive = getActiveListId();
+    if (savedActive && loaded.some((l) => l.id === savedActive)) {
+      setActiveListIdState(savedActive);
+    } else {
+      const first = loaded[0];
+      if (first) {
+        setActiveListIdState(first.id);
+        setActiveListId(first.id);
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    let alive = true;
+    loadLists();
+  }, [loadLists]);
+
+  // Load perfil
+  useEffect(() => {
     void (async () => {
       try {
-        const [list, perfil] = await Promise.all([fetchEntries(), fetchPerfil(userId)]);
-        if (!alive) return;
-        setEntries(list);
-        if (perfil) {
-          setDaily(String(perfil.diaria));
-          if (perfil.valorHora > 0) setHourRate(String(perfil.valorHora));
-        }
+        const p = await fetchPerfil(userId);
+        if (p) setPerfil(p);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Erro desconhecido";
-        console.error("Erro ao carregar dados:", msg);
-        if (alive) setErro("Erro ao carregar dados. Tente novamente.");
-      } finally {
-        if (alive) setLoaded(true);
+        console.error("Erro ao carregar perfil:", e);
       }
     })();
-    return () => {
-      alive = false;
-    };
   }, [userId]);
 
-  useEffect(() => {
-    if (!loaded) return;
-    const t = setTimeout(() => {
-      void savePerfil(userId, toNumber(daily), toNumber(hourRate)).catch(() => undefined);
-    }, 700);
-    return () => clearTimeout(t);
-  }, [daily, hourRate, loaded, userId]);
-
-  const extras = toNumber(hours) * toNumber(hourRate);
-  const entradaTotal = toNumber(daily) + extras;
-
-  const totals = useMemo(() => {
-    const inc = entries.filter((e) => e.kind === "entrada").reduce((s, e) => s + e.amount, 0);
-    const out = entries.filter((e) => e.kind === "saida").reduce((s, e) => s + e.amount, 0);
-    return { inc, out, saldo: inc - out };
-  }, [entries]);
-
-  const add = async () => {
-    const amount = kind === "entrada" ? entradaTotal : toNumber(expense);
-    if (amount <= 0) return;
-    const detail =
-      kind === "entrada" && extras > 0
-        ? `Diária ${brl(toNumber(daily))} + ${hours}h x ${brl(toNumber(hourRate))}`
-        : undefined;
-    try {
-      setErro(null);
-      const entry = await insertEntry({
-        userId,
-        label: label.trim() || (kind === "entrada" ? "Diária" : "Gasto"),
-        kind,
-        amount,
-        detail,
-      });
-      setEntries((prev) => [entry, ...prev]);
-      setLabel("");
-      setHours("");
-      setExpense("");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro desconhecido";
-      console.error("Erro ao salvar lançamento:", msg);
-      setErro("Erro ao salvar lançamento. Tente novamente.");
-    }
-  };
-
-  const remove = async (id: string) => {
-    const before = entries;
-    setEntries((prev) => prev.filter((x) => x.id !== id));
-    try {
-      await deleteEntry(id);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro desconhecido";
-      console.error("Erro ao apagar lançamento:", msg);
-      setEntries(before);
-      setErro("Erro ao apagar lançamento. Tente novamente.");
-    }
-  };
-
-  return (
-    <main className="flex min-h-screen justify-center px-4 py-8 sm:py-12">
-      <div className="w-full max-w-xl">
-        <header className="mb-7 text-center">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">
-              {telefone ? maskPhone(telefone) : "Minha conta"}
-            </span>
-            <button
-              type="button"
-              onClick={() => void supabase.auth.signOut()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <LogOut className="size-3.5" /> Sair
-            </button>
-          </div>
-          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-            <Wallet className="size-6" />
-          </div>
-          <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight">
-            Caixa do Dia
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Anote o que entrou e o que saiu. A data é automática.
-          </p>
-          {erro ? <p className="mt-2 text-sm font-medium text-expense">{erro}</p> : null}
-        </header>
-
-        {/* Saldo */}
-        <section
-          className="rounded-3xl border border-border p-6 text-center"
-          style={{ background: "var(--gradient-hero)", boxShadow: "var(--shadow-elegant)" }}
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Saldo em caixa
-          </p>
-          <p
-            className={`mt-2 font-[family-name:var(--font-display)] text-4xl font-bold tabular-nums sm:text-5xl ${
-              totals.saldo < 0 ? "text-expense" : "text-primary"
-            }`}
-          >
-            {brl(totals.saldo)}
-          </p>
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-background/40 px-3 py-3">
-              <p className="text-xs text-muted-foreground">Recebido</p>
-              <p className="font-semibold tabular-nums text-income">{brl(totals.inc)}</p>
-            </div>
-            <div className="rounded-2xl bg-background/40 px-3 py-3">
-              <p className="text-xs text-muted-foreground">Gasto</p>
-              <p className="font-semibold tabular-nums text-expense">{brl(totals.out)}</p>
-            </div>
-          </div>
-        </section>
-
-        {/* Lançamento */}
-        <section
-          className="mt-6 rounded-3xl border border-border bg-card p-5 sm:p-6"
-          style={{ boxShadow: "var(--shadow-soft)" }}
-        >
-          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-secondary p-1.5">
-            <button
-              type="button"
-              onClick={() => setKind("entrada")}
-              className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition-colors ${
-                kind === "entrada"
-                  ? "bg-income text-income-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <ArrowUpCircle className="size-4" /> Recebi
-            </button>
-            <button
-              type="button"
-              onClick={() => setKind("saida")}
-              className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition-colors ${
-                kind === "saida"
-                  ? "bg-expense text-expense-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <ArrowDownCircle className="size-4" /> Gastei
-            </button>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            <Field label={kind === "entrada" ? "Do que é (serviço, obra...)" : "Do que foi o gasto"}>
-              <input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder={kind === "entrada" ? "Ex: Diária na obra" : "Ex: Material, almoço"}
-                className="w-full rounded-xl border border-input bg-background px-4 py-3 text-base outline-none placeholder:text-muted-foreground/70 focus:border-ring focus:ring-2 focus:ring-ring/30"
-              />
-            </Field>
-
-            {kind === "entrada" ? (
-              <>
-                <Field label="Valor da diária (R$)">
-                  <input
-                    value={daily}
-                    onChange={(e) => setDaily(e.target.value)}
-                    inputMode="decimal"
-                    className="w-full rounded-xl border border-input bg-background px-4 py-4 font-[family-name:var(--font-display)] text-2xl font-semibold tabular-nums outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-                  />
-                </Field>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Horas extras">
-                    <input
-                      value={hours}
-                      onChange={(e) => setHours(e.target.value)}
-                      inputMode="decimal"
-                      placeholder="0"
-                      className="w-full rounded-xl border border-input bg-background px-4 py-3 text-lg tabular-nums outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-                    />
-                  </Field>
-                  <Field label="Valor da hora (R$)">
-                    <input
-                      value={hourRate}
-                      onChange={(e) => setHourRate(e.target.value)}
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      className="w-full rounded-xl border border-input bg-background px-4 py-3 text-lg tabular-nums outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-                    />
-                  </Field>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Total do dia:{" "}
-                  <span className="font-semibold text-income tabular-nums">
-                    {brl(entradaTotal)}
-                  </span>
-                  {extras > 0 ? ` (extras ${brl(extras)})` : ""}
-                </p>
-              </>
-            ) : (
-              <Field label="Valor gasto (R$)">
-                <input
-                  value={expense}
-                  onChange={(e) => setExpense(e.target.value)}
-                  inputMode="decimal"
-                  placeholder="0,00"
-                  className="w-full rounded-xl border border-input bg-background px-4 py-4 font-[family-name:var(--font-display)] text-2xl font-semibold tabular-nums outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-                />
-              </Field>
-            )}
-
-            <button
-              type="button"
-              onClick={() => void add()}
-              className={`w-full rounded-xl px-4 py-4 text-base font-bold transition-transform active:scale-[0.99] ${
-                kind === "entrada"
-                  ? "bg-income text-income-foreground"
-                  : "bg-expense text-expense-foreground"
-              }`}
-            >
-              {kind === "entrada" ? "Lançar recebimento" : "Lançar gasto"}
-            </button>
-          </div>
-        </section>
-
-        {/* Tabela */}
-        <section className="mt-6 overflow-hidden rounded-3xl border border-border bg-card">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 className="font-[family-name:var(--font-display)] text-base font-semibold">
-              Lançamentos
-            </h2>
-            <span className="text-xs text-muted-foreground">{entries.length} registro(s)</span>
-          </div>
-
-          {!loaded ? (
-            <p className="px-5 py-10 text-center text-sm text-muted-foreground">Carregando…</p>
-          ) : entries.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-              Nenhum lançamento ainda. Comece registrando sua diária.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {entries.map((e) => (
-                <li key={e.id} className="flex items-center gap-3 px-5 py-4">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{e.label}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {formatDate(e.date)}
-                      {e.detail ? ` • ${e.detail}` : ""}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 font-semibold tabular-nums ${
-                      e.kind === "entrada" ? "text-income" : "text-expense"
-                    }`}
-                  >
-                    {e.kind === "entrada" ? "+" : "-"} {brl(e.amount)}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={`Apagar ${e.label}`}
-                    onClick={() => void remove(e.id)}
-                    className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-expense"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="flex items-center justify-between border-t border-border bg-secondary/40 px-5 py-4">
-            <span className="text-sm font-semibold">Total a receber / saldo</span>
-            <span
-              className={`font-[family-name:var(--font-display)] text-lg font-bold tabular-nums ${
-                totals.saldo < 0 ? "text-expense" : "text-income"
-              }`}
-            >
-              {brl(totals.saldo)}
-            </span>
-          </div>
-        </section>
-
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          Seus dados ficam salvos na sua conta.
-        </p>
-      </div>
-    </main>
+  // Save perfil when daily/hourRate changes (debounced handled in previous version)
+  const handlePerfilSave = useCallback(
+    (diaria: number, valorHora: number) => {
+      setPerfil({ diaria, valorHora });
+      void savePerfil(userId, diaria, valorHora).catch(() => undefined);
+    },
+    [userId]
   );
-}
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  // Handle list selection
+  const handleSelectList = (id: string) => {
+    setActiveListIdState(id);
+    setActiveListId(id);
+    setMobileSidebarOpen(false);
+  };
+
+  // Handle sign out
+  const handleSignOut = () => {
+    void supabase.auth.signOut();
+  };
+
+  const activeList = lists.find((l) => l.id === activeListId);
+
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </span>
-      {children}
-    </label>
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* Desktop sidebar */}
+      <div className="hidden lg:flex">
+        <WalletSidebar
+          lists={lists}
+          activeListId={activeListId}
+          onSelectList={handleSelectList}
+          onUpdate={loadLists}
+          telefone={telefone}
+          onSignOut={handleSignOut}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((p) => !p)}
+        />
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <div className="relative z-50 h-full">
+            <WalletSidebar
+              lists={lists}
+              activeListId={activeListId}
+              onSelectList={handleSelectList}
+              onUpdate={loadLists}
+              telefone={telefone}
+              onSignOut={handleSignOut}
+              collapsed={false}
+              onToggleCollapse={() => setMobileSidebarOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Main content area */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile header */}
+        <div className="flex items-center gap-3 border-b border-border bg-background px-4 py-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileSidebarOpen(true)}
+            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <PanelLeftOpen className="size-5" />
+          </button>
+          {activeList && (
+            <span className="font-[family-name:var(--font-display)] text-sm font-semibold">
+              {activeList.name}
+            </span>
+          )}
+        </div>
+
+        {/* Desktop collapse toggle */}
+        {sidebarCollapsed && (
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed(false)}
+            className="absolute left-2 top-3 z-30 hidden size-8 items-center justify-center rounded-lg bg-card text-muted-foreground shadow-sm transition-colors hover:bg-secondary hover:text-foreground lg:flex"
+          >
+            <PanelLeftClose className="size-4" />
+          </button>
+        )}
+
+        {/* Error message */}
+        {erro && (
+          <div className="border-b border-destructive/20 bg-destructive/5 px-6 py-2">
+            <p className="text-sm font-medium text-destructive">{erro}</p>
+          </div>
+        )}
+
+        {/* Wallet content */}
+        <div className="flex-1 overflow-hidden">
+          {activeList ? (
+            <WalletDashboard
+              key={activeList.id}
+              list={activeList}
+              userId={userId}
+              perfil={perfil}
+              onError={setErro}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  Selecione uma lista na barra lateral.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

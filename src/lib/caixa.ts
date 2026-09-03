@@ -9,7 +9,19 @@ export type Entry = {
   kind: Kind;
   amount: number;
   detail?: string | undefined;
+  listaId?: string | null;
 };
+
+export type WalletList = {
+  id: string;
+  name: string;
+  createdAt: number;
+};
+
+const LISTS_KEY = "caixa_wallet_lists";
+const ACTIVE_LIST_KEY = "caixa_active_list";
+
+// ── Currency & date helpers (preserved) ──────────────────────────────
 
 export const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
@@ -40,6 +52,62 @@ export const maskPhone = (v: string) => {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 };
 
+// ── Wallet Lists (localStorage) ──────────────────────────────────────
+
+export function fetchWalletLists(): WalletList[] {
+  try {
+    const raw = localStorage.getItem(LISTS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as WalletList[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveWalletLists(lists: WalletList[]): void {
+  localStorage.setItem(LISTS_KEY, JSON.stringify(lists));
+}
+
+export function createWalletList(name: string): WalletList {
+  const lists = fetchWalletLists();
+  const newList: WalletList = {
+    id: crypto.randomUUID(),
+    name: name.trim(),
+    createdAt: Date.now(),
+  };
+  lists.push(newList);
+  saveWalletLists(lists);
+  return newList;
+}
+
+export function renameWalletList(id: string, name: string): void {
+  const lists = fetchWalletLists();
+  const list = lists.find((l) => l.id === id);
+  if (list) {
+    list.name = name.trim();
+    saveWalletLists(lists);
+  }
+}
+
+export function deleteWalletList(id: string): void {
+  const lists = fetchWalletLists().filter((l) => l.id !== id);
+  saveWalletLists(lists);
+}
+
+export function getActiveListId(): string | null {
+  return localStorage.getItem(ACTIVE_LIST_KEY);
+}
+
+export function setActiveListId(id: string | null): void {
+  if (id) {
+    localStorage.setItem(ACTIVE_LIST_KEY, id);
+  } else {
+    localStorage.removeItem(ACTIVE_LIST_KEY);
+  }
+}
+
+// ── Entry helpers ────────────────────────────────────────────────────
+
 type Row = {
   id: string;
   data: string;
@@ -47,6 +115,7 @@ type Row = {
   tipo: string;
   valor: number | string;
   detalhe: string | null;
+  lista_id: string | null;
 };
 
 const toEntry = (r: Row): Entry => ({
@@ -56,14 +125,25 @@ const toEntry = (r: Row): Entry => ({
   kind: r.tipo === "saida" ? "saida" : "entrada",
   amount: Number(r.valor),
   detail: r.detalhe ?? undefined,
+  listaId: r.lista_id ?? null,
 });
 
-export async function fetchEntries(): Promise<Entry[]> {
-  const { data, error } = await supabase
+export async function fetchEntries(listaId?: string | null): Promise<Entry[]> {
+  let query = supabase
     .from("lancamentos")
-    .select("id, data, descricao, tipo, valor, detalhe")
+    .select("id, data, descricao, tipo, valor, detalhe, lista_id")
     .order("data", { ascending: false })
     .order("created_at", { ascending: false });
+
+  if (listaId === null) {
+    // Fetch entries with no lista_id (legacy/default)
+    query = query.is("lista_id", null);
+  } else if (listaId !== undefined) {
+    // Fetch entries for a specific list
+    query = query.eq("lista_id", listaId);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map((r) => toEntry(r as Row));
 }
@@ -74,6 +154,7 @@ export async function insertEntry(input: {
   kind: Kind;
   amount: number;
   detail?: string | undefined;
+  listaId?: string | null;
 }): Promise<Entry> {
   const { data, error } = await supabase
     .from("lancamentos")
@@ -84,8 +165,9 @@ export async function insertEntry(input: {
       valor: input.amount,
       detalhe: input.detail ?? null,
       data: today(),
+      lista_id: input.listaId ?? null,
     })
-    .select("id, data, descricao, tipo, valor, detalhe")
+    .select("id, data, descricao, tipo, valor, detalhe, lista_id")
     .single();
   if (error) throw error;
   return toEntry(data as Row);
