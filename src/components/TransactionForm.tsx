@@ -27,16 +27,24 @@ export function TransactionForm({
   const [label, setLabel] = useState("");
   const [hours, setHours] = useState("");
   const [expense, setExpense] = useState("");
+  const [localDaily, setLocalDaily] = useState(daily);
+
+  // Sync localDaily when prop changes (e.g. profile loaded)
+  // eslint-disable-next-line
+  const prevDailyRef = daily;
+  if (prevDailyRef !== daily) {
+    setLocalDaily(daily);
+  }
 
   const extras = toNumber(hours) * toNumber(hourRate);
-  const entradaTotal = toNumber(daily) + extras;
+  const entradaTotal = toNumber(localDaily) + extras;
 
   const submit = async () => {
     const amount = kind === "entrada" ? entradaTotal : toNumber(expense);
     if (amount <= 0) return;
     const detail =
       kind === "entrada" && extras > 0
-        ? `Diária ${brl(toNumber(daily))} + ${hours}h x ${brl(toNumber(hourRate))}`
+        ? `Diária ${brl(toNumber(localDaily))} + ${hours}h x ${brl(toNumber(hourRate))}`
         : undefined;
     try {
       onError("");
@@ -109,11 +117,10 @@ export function TransactionForm({
                 Valor da diária (R$)
               </span>
               <input
-                value={daily}
-                onChange={(e) => {}}
+                value={localDaily}
+                onChange={(e) => setLocalDaily(e.target.value)}
                 inputMode="decimal"
-                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 font-[family-name:var(--font-display)] text-lg font-semibold tabular-nums outline-none focus:border-ring focus:ring-1 focus:ring-ring/30"
-                readOnly
+                className="w-full rounded-lg border border-input bg-background px-3 py-2.5 font-[family-name:var(--font-display)] text-lg font-semibold tabular-nums outline-none placeholder:text-muted-foreground/50 focus:border-ring focus:ring-1 focus:ring-ring/30"
               />
             </label>
             <div className="grid grid-cols-2 gap-2">

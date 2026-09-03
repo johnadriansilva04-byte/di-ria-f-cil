@@ -162,10 +162,11 @@ export function WalletDashboard({
               <button
                 type="button"
                 onClick={() => setEditingName(true)}
-                className="rounded-md p-1.5 text-muted-foreground/40 transition-colors hover:bg-secondary hover:text-foreground"
-                title="Renomear"
+                className="rounded-md p-2 text-muted-foreground/60 transition-colors hover:bg-secondary hover:text-foreground"
+                title="Renomear caixa"
+                aria-label="Renomear caixa"
               >
-                <Pencil className="size-3.5" />
+                <Pencil className="size-4" />
               </button>
             </>
           )}
