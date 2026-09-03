@@ -14,6 +14,14 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  // Don't intercept Supabase API requests or other API calls
+  const url = new URL(event.request.url);
+  if (url.pathname.includes('/auth/v1/') || 
+      url.pathname.includes('/rest/v1/') ||
+      url.hostname.includes('supabase.co')) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((response) => {
       if (response) {

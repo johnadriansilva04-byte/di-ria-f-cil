@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownCircle, ArrowUpCircle, LogOut, Trash2, Wallet } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, LogOut, Trash2, Wallet, Download, X } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthTelefone } from "@/components/AuthTelefone";
@@ -37,6 +37,84 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+// Componente de prompt de instalação PWA
+function InstallPrompt() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showPrompt, setShowPrompt] = useState(false);
+
+  useEffect(() => {
+    // Verificar se já mostrou o prompt antes
+    const hasShownPrompt = localStorage.getItem('pwa-install-prompt-shown');
+    if (hasShownPrompt) return;
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowPrompt(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      console.log('PWA instalado com sucesso');
+    }
+    
+    setDeferredPrompt(null);
+    setShowPrompt(false);
+    localStorage.setItem('pwa-install-prompt-shown', 'true');
+  };
+
+  const handleDismiss = () => {
+    setShowPrompt(false);
+    localStorage.setItem('pwa-install-prompt-shown', 'true');
+  };
+
+  if (!showPrompt || !deferredPrompt) return null;
+
+  return (
+    <div className="fixed bottom-4 left-4 right-4 z-50 sm:left-auto sm:right-4 sm:w-80">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-lg">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <Download className="size-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Instalar App</p>
+              <p className="text-xs text-muted-foreground">
+                Adicione à tela inicial para acesso rápido
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleDismiss}
+            className="rounded-lg p-1 text-muted-foreground hover:bg-secondary"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <button
+          onClick={handleInstall}
+          className="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          Instalar agora
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Index() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
@@ -63,7 +141,12 @@ function Index() {
 
   if (!session) return <AuthTelefone />;
 
-  return <Caixa session={session} />;
+  return (
+    <>
+      <Caixa session={session} />
+      <InstallPrompt />
+    </>
+  );
 }
 
 function Caixa({ session }: { session: Session }) {
