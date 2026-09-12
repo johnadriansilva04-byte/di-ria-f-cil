@@ -28,9 +28,8 @@ const config = { resultado: { label: "Resultado" } } satisfies ChartConfig;
 /**
  * Gráfico geral (donut) da Home: o RESULTADO de cada caixa como fatia.
 
- * O donut fica em cima e os CARDS dos caixas sao a propria legenda,
- * cada um com a bolinha da cor da sua fatia. Clicar em um card abre o caixa.
-
+ * Os CARDS dos caixas ficam à esquerda como legenda compacta (cada um com a
+ * bolinha da cor da sua fatia) e o donut fica à direita. Clicar em um card abre o caixa.
  */
 export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: HomeDonutChartProps) {
   const byList = useMemo(() => totalsByList(entries), [entries]);
@@ -91,89 +90,42 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
         </span>
       </header>
 
-      {/* Donut em cima */}
-      <div className="flex justify-center">
-        <div className="relative size-48 sm:size-56">
-          {totalAbs > 0 ? (
-            <ChartContainer config={config} className="aspect-auto size-full">
-              <PieChart>
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--card)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 12,
-                    fontSize: 12,
-                    color: "var(--foreground)",
-                  }}
-                  formatter={(value) => brl(Number(value))}
-                />
-                <Pie
-                  data={data}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius="70%"
-                  outerRadius="100%"
-                  paddingAngle={3}
-                  strokeWidth={0}
+      {/* Cards dos caixas (legenda) à esquerda + donut à direita */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <ul className="flex w-full flex-col gap-2">
+          {data.map((d, index) => {
+            const s = byList[d.id] ?? {
+              income: 0,
+              expense: 0,
+              balance: 0,
+              count: 0,
+            };
+            return (
+              <li key={d.id}>
+                <button
+                  type="button"
+                  onClick={() => onOpenList?.(d.id)}
+                  aria-label={`Abrir caixa ${d.name}`}
+                  className="group flex w-full items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-2 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
                 >
-                  {data.map((d, index) => (
-                    <Cell
-                      key={d.id}
-                      fill={DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0]}
-                    />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ChartContainer>
-          ) : (
-            <div aria-hidden className="size-full rounded-full border-[14px] border-border/40" />
-          )}
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-              Resultado geral
-            </span>
-            <span
-              className={cn(
-                "mt-0.5 font-[family-name:var(--font-display)] text-lg font-bold tabular-nums sm:text-xl",
-                totalBalance < 0
-                  ? "text-expense"
-                  : totalBalance > 0
-                    ? "text-income"
-                    : "text-muted-foreground/60",
-              )}
-            >
-              {totalBalance >= 0 ? "+" : "−"} {brl(Math.abs(totalBalance))}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Legenda = cards dos caixas */}
-      <ul className="mt-4 grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-        {data.map((d, index) => {
-          const s = byList[d.id] ?? {
-            income: 0,
-            expense: 0,
-            balance: 0,
-            count: 0,
-          };
-          return (
-            <li key={d.id}>
-              <button
-                type="button"
-                onClick={() => onOpenList?.(d.id)}
-                aria-label={`Abrir caixa ${d.name}`}
-                className="group flex w-full flex-col items-start gap-1.5 rounded-xl border border-border bg-card px-2.5 py-2.5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
-              >
-                <span className="flex w-full min-w-0 items-center justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <span
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{
-                        background: DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0],
-                      }}
-                    />
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{
+                      background: DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0],
+                    }}
+                  />
+                  <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-semibold leading-tight">{d.name}</span>
+                    <span className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground/70">
+                      <span className="inline-flex items-center gap-1">
+                        <TrendingUp className="size-3 text-income" />
+                        {brlCompact(s.income)}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <TrendingDown className="size-3 text-expense" />
+                        {brlCompact(s.expense)}
+                      </span>
+                    </span>
                   </span>
                   <span
                     className={cn(
@@ -187,22 +139,69 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
                   >
                     {s.balance >= 0 ? "+" : "−"} {brlCompact(Math.abs(s.balance))}
                   </span>
-                </span>
-                <span className="flex w-full items-center gap-3 text-[11px] text-muted-foreground/70">
-                  <span className="inline-flex items-center gap-1">
-                    <TrendingUp className="size-3 text-income" />
-                    {brlCompact(s.income)}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <TrendingDown className="size-3 text-expense" />
-                    {brlCompact(s.expense)}
-                  </span>
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        {/* Donut à direita */}
+        <div className="flex justify-center lg:justify-end">
+          <div className="relative size-44 sm:size-52 lg:size-56">
+            {totalAbs > 0 ? (
+              <ChartContainer config={config} className="aspect-auto size-full">
+                <PieChart>
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--card)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 12,
+                      fontSize: 12,
+                      color: "var(--foreground)",
+                    }}
+                    formatter={(value) => brl(Number(value))}
+                  />
+                  <Pie
+                    data={data}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius="70%"
+                    outerRadius="100%"
+                    paddingAngle={3}
+                    strokeWidth={0}
+                  >
+                    {data.map((d, index) => (
+                      <Cell
+                        key={d.id}
+                        fill={DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0]}
+                      />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ChartContainer>
+            ) : (
+              <div aria-hidden className="size-full rounded-full border-[14px] border-border/40" />
+            )}
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                Resultado geral
+              </span>
+              <span
+                className={cn(
+                  "mt-0.5 font-[family-name:var(--font-display)] text-lg font-bold tabular-nums sm:text-xl",
+                  totalBalance < 0
+                    ? "text-expense"
+                    : totalBalance > 0
+                      ? "text-income"
+                      : "text-muted-foreground/60",
+                )}
+              >
+                {totalBalance >= 0 ? "+" : "−"} {brl(Math.abs(totalBalance))}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
