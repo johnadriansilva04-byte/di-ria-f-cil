@@ -27,18 +27,16 @@ export function HomeDonutChart({ lists, entries }: HomeDonutChartProps) {
   const byList = useMemo(() => totalsByList(entries), [entries]);
   const data = useMemo(
     () =>
-      lists
-        .map((l) => ({
-          name: l.name,
-          value: Math.round(byList[l.id]?.income ?? 0),
-        }))
-        .filter((d) => d.value > 0),
+      lists.map((l) => ({
+        name: l.name,
+        value: Math.round(byList[l.id]?.income ?? 0),
+      })),
     [lists, byList],
   );
 
   const total = data.reduce((sum, d) => sum + d.value, 0);
 
-  if (total === 0 || data.length === 0) {
+  if (total === 0) {
     return (
       <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
         <header className="mb-3 flex items-center justify-between gap-2">
@@ -73,9 +71,9 @@ export function HomeDonutChart({ lists, entries }: HomeDonutChartProps) {
         </span>
       </header>
 
-      <div className="flex flex-col items-center gap-4 sm:flex-row">
-        {/* Donut */}
-        <div className="relative size-44 shrink-0 sm:size-52">
+      <div className="flex flex-col items-center">
+        {/* Gráfico em cima */}
+        <div className="relative size-48 sm:size-56">
           <ChartContainer config={config} className="aspect-auto size-full">
             <PieChart>
               <Tooltip
@@ -92,7 +90,7 @@ export function HomeDonutChart({ lists, entries }: HomeDonutChartProps) {
                 data={data}
                 dataKey="value"
                 nameKey="name"
-                innerRadius="68%"
+                innerRadius="70%"
                 outerRadius="100%"
                 paddingAngle={3}
                 strokeWidth={0}
@@ -113,8 +111,8 @@ export function HomeDonutChart({ lists, entries }: HomeDonutChartProps) {
           </div>
         </div>
 
-        {/* Legenda */}
-        <ul className="w-full min-w-0 flex-1 space-y-1.5">
+        {/* Legenda: nomes dos caixas embaixo */}
+        <ul className="mt-5 grid w-full gap-x-6 gap-y-2 sm:grid-cols-2">
           {data.map((d, index) => (
             <li key={d.name} className="flex items-center gap-2">
               <span
@@ -124,7 +122,7 @@ export function HomeDonutChart({ lists, entries }: HomeDonutChartProps) {
               <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
                 {d.name}
               </span>
-              <span className="text-xs tabular-nums text-muted-foreground/60">
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground/60">
                 {total > 0 ? ((d.value / total) * 100).toFixed(0).replace(".", ",") : "0"}%
               </span>
               <span
