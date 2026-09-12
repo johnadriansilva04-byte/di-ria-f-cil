@@ -82,6 +82,15 @@ export function HomeOverview({
               </div>
             </section>
 
+            {/* Gráfico geral (pizza por caixa) — em cima, sem precisar rolar */}
+            <Suspense
+              fallback={
+                <div className="h-64 animate-pulse rounded-2xl border border-border bg-card" />
+              }
+            >
+              <HomeDonutChart lists={lists} entries={entries} />
+            </Suspense>
+
             {/* Recebido / Gasto / Resultado */}
             <section className="grid grid-cols-3 gap-2 sm:gap-3">
               <div className="rounded-xl border border-border bg-card px-3 py-3 sm:px-4 sm:py-4">
@@ -210,15 +219,6 @@ export function HomeOverview({
                 </ul>
               )}
             </section>
-
-            {/* Gráfico geral (pizza por caixa) */}
-            <Suspense
-              fallback={
-                <div className="h-64 animate-pulse rounded-2xl border border-border bg-card" />
-              }
-            >
-              <HomeDonutChart lists={lists} entries={entries} />
-            </Suspense>
           </div>
         )}
       </div>
