@@ -1,12 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Download, PanelLeftOpen, RefreshCw, Wallet, X } from "lucide-react";
+import { Download, PanelLeftOpen, RefreshCw, Volume2, VolumeX, Wallet, X } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthTelefone } from "@/components/AuthTelefone";
 import { WalletSidebar } from "@/components/WalletSidebar";
 import { WalletDashboard } from "@/components/WalletDashboard";
+import { LaunchFeedback, type LaunchFx } from "@/components/LaunchFeedback";
+import {
+  isSoundEnabled,
+  playGain,
+  playSpend,
+  playTick,
+  primeAudio,
+  setSoundEnabled,
+} from "@/lib/sfx";
 import { useCaixa } from "@/hooks/use-caixa";
+import type { Entry } from "@/lib/caixa";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -203,6 +213,32 @@ function Dashboard({ session }: { session: Session }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [fx, setFx] = useState<LaunchFx | null>(null);
+  const [sound, setSound] = useState(true);
+
+  useEffect(() => {
+    setSound(isSoundEnabled());
+  }, []);
+
+  // Som + animação de confirmação: verde no ganho, vermelho no gasto.
+  const handleLaunched = (entry: Entry) => {
+    if (entry.kind === "entrada") playGain();
+    else playSpend();
+    setFx({
+      id: Date.now(),
+      kind: entry.kind,
+      amount: entry.amount,
+      listName: caixa.activeList?.name ?? "sua lista",
+    });
+  };
+
+  const toggleSound = () => {
+    const next = !sound;
+    primeAudio();
+    setSoundEnabled(next);
+    setSound(next);
+    if (next) playTick();
+  };
 
   const error = actionError ?? caixa.error;
   const daily = caixa.perfil ? String(caixa.perfil.diaria) : "130";
@@ -283,9 +319,19 @@ function Dashboard({ session }: { session: Session }) {
           >
             <PanelLeftOpen className="size-5" />
           </button>
-          <span className="truncate font-[family-name:var(--font-display)] text-sm font-semibold">
+          <span className="min-w-0 flex-1 truncate font-[family-name:var(--font-display)] text-sm font-semibold">
             {caixa.activeList ? caixa.activeList.name : "Caixa"}
           </span>
+          <button
+            type="button"
+            onClick={toggleSound}
+            aria-pressed={sound}
+            aria-label={sound ? "Desligar som" : "Ligar som"}
+            title={sound ? "Som ligado" : "Som desligado"}
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            {sound ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
+          </button>
         </div>
 
         {/* Erros */}
@@ -330,6 +376,7 @@ function Dashboard({ session }: { session: Session }) {
               onEditEntry={caixa.editEntry}
               onDeleteEntry={caixa.removeEntry}
               onSavePerfil={(diaria, valorHora) => void caixa.updatePerfil(diaria, valorHora)}
+              onLaunched={handleLaunched}
               onError={setActionError}
             />
           ) : (
@@ -343,6 +390,8 @@ function Dashboard({ session }: { session: Session }) {
           )}
         </div>
       </div>
+
+      {fx ? <LaunchFeedback key={fx.id} fx={fx} onDone={() => setFx(null)} /> : null}
     </div>
   );
 }

@@ -28,6 +28,7 @@ interface WalletDashboardProps {
   onEditEntry: (id: string, patch: EntryPatch) => Promise<void>;
   onDeleteEntry: (id: string) => Promise<void>;
   onSavePerfil: (diaria: number, valorHora: number) => void;
+  onLaunched: (entry: Entry) => void;
   onError: (msg: string | null) => void;
 }
 
@@ -45,6 +46,7 @@ export function WalletDashboard({
   onEditEntry,
   onDeleteEntry,
   onSavePerfil,
+  onLaunched,
   onError,
 }: WalletDashboardProps) {
   // "Tudo" é o saldo real do caixa; os outros períodos são lentes de análise.
@@ -180,6 +182,7 @@ export function WalletDashboard({
                 hourRate={hourRate}
                 onCreate={onCreate}
                 onSavePerfil={onSavePerfil}
+                onLaunched={onLaunched}
                 onError={onError}
               />
 

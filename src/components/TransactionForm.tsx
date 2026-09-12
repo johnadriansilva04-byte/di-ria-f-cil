@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { brl, errorMessage, today, toNumber, type Entry, type Kind } from "@/lib/caixa";
 import type { NewEntry } from "@/hooks/use-caixa";
+import { primeAudio } from "@/lib/sfx";
 import { cn } from "@/lib/utils";
 
 interface TransactionFormProps {
@@ -18,6 +19,7 @@ interface TransactionFormProps {
   hourRate: string;
   onCreate: (input: NewEntry) => Promise<Entry>;
   onSavePerfil: (diaria: number, valorHora: number) => void;
+  onLaunched: (entry: Entry) => void;
   onError: (msg: string | null) => void;
 }
 
@@ -37,6 +39,7 @@ export function TransactionForm({
   hourRate,
   onCreate,
   onSavePerfil,
+  onLaunched,
   onError,
 }: TransactionFormProps) {
   const [kind, setKind] = useState<Kind>("entrada");
@@ -84,6 +87,8 @@ export function TransactionForm({
       onError("Informe um valor maior que zero para lançar.");
       return;
     }
+    // O navegador só libera áudio dentro do gesto do usuário.
+    primeAudio();
     setBusy(true);
     onError(null);
     try {
@@ -94,9 +99,8 @@ export function TransactionForm({
         detail: kind === "entrada" ? detail : undefined,
         date: date || today(),
       });
-      toast.success(
-        `${kind === "entrada" ? "Entrada" : "Saída"} de ${brl(entry.amount)} em ${listName}`,
-      );
+      // Confirmação visual + som do lançamento (verde no ganho, vermelho no gasto).
+      onLaunched(entry);
       setLabel("");
       setHours("");
       setTouched(false);
