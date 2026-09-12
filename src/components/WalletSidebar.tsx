@@ -14,6 +14,7 @@ interface WalletSidebarProps {
   onDelete: (id: string) => Promise<void>;
   telefone?: string;
   onSignOut: () => void;
+  onDeleteAccount: () => Promise<void>;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -31,6 +32,7 @@ export function WalletSidebar({
   onDelete,
   telefone,
   onSignOut,
+  onDeleteAccount,
   collapsed = false,
   onToggleCollapse,
 }: WalletSidebarProps) {
@@ -39,6 +41,7 @@ export function WalletSidebar({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmAccount, setConfirmAccount] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const newInputRef = useRef<HTMLInputElement>(null);
@@ -370,6 +373,40 @@ export function WalletSidebar({
             Sair
           </button>
         </div>
+
+        {confirmAccount ? (
+          <div className="mt-2 rounded-lg bg-destructive/10 px-3 py-2">
+            <p className="text-[11px] text-destructive">
+              Apagar sua conta? Todas as listas e lançamentos saem do banco e isso não volta.
+            </p>
+            <div className="mt-1.5 flex items-center justify-end gap-1">
+              <button
+                type="button"
+                onClick={() => void run(onDeleteAccount)}
+                disabled={busy}
+                className="rounded bg-destructive px-2 py-1 text-[11px] font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+              >
+                Apagar tudo
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmAccount(false)}
+                className="rounded px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmAccount(true)}
+            className="mt-1 flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-destructive"
+          >
+            <Trash2 className="size-3" />
+            Excluir minha conta
+          </button>
+        )}
       </div>
     </div>
   );

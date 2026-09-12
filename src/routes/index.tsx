@@ -265,6 +265,7 @@ function Dashboard({ session }: { session: Session }) {
           onDelete={caixa.removeList}
           telefone={telefone}
           onSignOut={() => void supabase.auth.signOut()}
+          onDeleteAccount={caixa.deleteAccount}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
         />
@@ -290,6 +291,7 @@ function Dashboard({ session }: { session: Session }) {
               onDelete={caixa.removeList}
               telefone={telefone}
               onSignOut={() => void supabase.auth.signOut()}
+              onDeleteAccount={caixa.deleteAccount}
               collapsed={false}
               onToggleCollapse={() => setMobileSidebarOpen(false)}
             />

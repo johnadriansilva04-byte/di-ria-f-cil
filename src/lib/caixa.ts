@@ -296,18 +296,31 @@ export function clearLegacyLocalLists(): void {
   }
 }
 
+const NOTHING_CHANGED =
+  "O banco não alterou nada: o registro não existe mais ou não pertence à sua conta.";
+
 export async function renameList(id: string, name: string): Promise<void> {
-  const { error } = await supabase.from("listas").update({ nome: name.trim() }).eq("id", id);
+  const { data, error } = await supabase
+    .from("listas")
+    .update({ nome: name.trim() })
+    .eq("id", id)
+    .select("id");
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error(NOTHING_CHANGED);
 }
 
 /** Exclui a lista junto com todos os lançamentos que pertencem a ela. */
 export async function deleteList(id: string): Promise<void> {
-  const { error: entriesError } = await supabase.from("lancamentos").delete().eq("lista_id", id);
+  const { error: entriesError } = await supabase
+    .from("lancamentos")
+    .delete()
+    .eq("lista_id", id)
+    .select("id");
   if (entriesError) throw entriesError;
 
-  const { error } = await supabase.from("listas").delete().eq("id", id);
+  const { data, error } = await supabase.from("listas").delete().eq("id", id).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error(NOTHING_CHANGED);
 }
 
 /** Lançamentos antigos (sem lista) passam a pertencer à lista informada. */
@@ -398,13 +411,45 @@ export async function updateEntry(id: string, patch: EntryPatch): Promise<void> 
   if (patch.detail !== undefined) payload.detalhe = patch.detail;
   if (patch.listaId !== undefined) payload.lista_id = patch.listaId;
 
-  const { error } = await supabase.from("lancamentos").update(payload).eq("id", id);
+  const { data, error } = await supabase
+    .from("lancamentos")
+    .update(payload)
+    .eq("id", id)
+    .select("id");
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error(NOTHING_CHANGED);
 }
 
+/**
+ * Apaga do banco e confirma que a linha saiu de verdade.
+ * Sem o `.select()`, o Supabase não avisa quando o delete não pegou nada.
+ */
 export async function deleteEntry(id: string): Promise<void> {
-  const { error } = await supabase.from("lancamentos").delete().eq("id", id);
+  const { data, error } = await supabase.from("lancamentos").delete().eq("id", id).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error(NOTHING_CHANGED);
+}
+
+// ── Conta do usuário ─────────────────────────────────────────────────
+
+/**
+ * Exclui a conta do usuário no banco (listas, lançamentos, perfil e login).
+ * A exclusão roda numa função do Supabase que só apaga o usuário autenticado.
+ */
+export async function deleteMyAccount(): Promise<void> {
+  const { error } = await supabase.rpc("excluir_minha_conta");
+  if (error) {
+    if (
+      error.code === "PGRST202" ||
+      error.code === "404" ||
+      error.message.includes("excluir_minha_conta")
+    ) {
+      throw new Error(
+        "O banco ainda não tem a função de exclusão de conta. Rode supabase/setup_completo.sql no SQL Editor do Supabase.",
+      );
+    }
+    throw error;
+  }
 }
 
 // ── Perfil (diária / valor da hora) ──────────────────────────────────

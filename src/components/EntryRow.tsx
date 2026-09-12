@@ -7,6 +7,7 @@ import {
   toNumber,
   type Entry,
   type EntryPatch,
+  type Kind,
   type WalletList,
 } from "@/lib/caixa";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ export function EntryRow({ entry, lists, onSave, onDelete, onError }: EntryRowPr
   const [amount, setAmount] = useState(String(entry.amount).replace(".", ","));
   const [date, setDate] = useState(entry.date);
   const [listaId, setListaId] = useState(entry.listaId ?? "");
+  const [kindLocal, setKindLocal] = useState<Kind>(entry.kind);
 
   const income = entry.kind === "entrada";
 
@@ -43,6 +45,7 @@ export function EntryRow({ entry, lists, onSave, onDelete, onError }: EntryRowPr
     onError(null);
     try {
       const patch: EntryPatch = { label: label.trim() || entry.label, amount: value, date };
+      if (kindLocal !== entry.kind) patch.kind = kindLocal;
       if (listaId && listaId !== entry.listaId) patch.listaId = listaId;
       await onSave(entry.id, patch);
       setEditing(false);
@@ -68,6 +71,29 @@ export function EntryRow({ entry, lists, onSave, onDelete, onError }: EntryRowPr
   if (editing) {
     return (
       <li className="space-y-2 bg-secondary/20 px-4 py-3 sm:px-6">
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-secondary p-1">
+          {[
+            { id: "entrada" as Kind, text: "Receber" },
+            { id: "saida" as Kind, text: "Gastar" },
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setKindLocal(option.id)}
+              aria-pressed={kindLocal === option.id}
+              className={cn(
+                "rounded-md px-3 py-2 text-xs font-bold transition-colors",
+                kindLocal === option.id
+                  ? option.id === "entrada"
+                    ? "bg-income text-income-foreground"
+                    : "bg-expense text-expense-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {option.text}
+            </button>
+          ))}
+        </div>
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
@@ -121,6 +147,7 @@ export function EntryRow({ entry, lists, onSave, onDelete, onError }: EntryRowPr
               setAmount(String(entry.amount).replace(".", ","));
               setDate(entry.date);
               setListaId(entry.listaId ?? "");
+              setKindLocal(entry.kind);
             }}
             className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >

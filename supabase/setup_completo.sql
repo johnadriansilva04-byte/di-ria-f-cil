@@ -140,3 +140,36 @@ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.lancamentos;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
+
+-- ============================================================
+-- EXCLUSÃO DA PRÓPRIA CONTA (tudo do usuário sai do banco)
+-- ============================================================
+-- O app nunca guarda chave de serviço: quem apaga é esta função, que roda
+-- com privilégio do dono do banco e SÓ toca no usuário autenticado (auth.uid()).
+-- Ao apagar o login em auth.users, listas e lançamentos vão junto pelo
+-- ON DELETE CASCADE; o DELETE explícito abaixo garante o mesmo resultado
+-- mesmo em bancos onde a FK ainda não exista.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.excluir_minha_conta()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  uid UUID := auth.uid();
+BEGIN
+  IF uid IS NULL THEN
+    RAISE EXCEPTION 'Nenhum usuário autenticado';
+  END IF;
+
+  DELETE FROM public.lancamentos WHERE user_id = uid;
+  DELETE FROM public.listas WHERE user_id = uid;
+  DELETE FROM public.perfis WHERE id = uid;
+  DELETE FROM auth.users WHERE id = uid;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.excluir_minha_conta() FROM anon, PUBLIC;
+GRANT EXECUTE ON FUNCTION public.excluir_minha_conta() TO authenticated;
