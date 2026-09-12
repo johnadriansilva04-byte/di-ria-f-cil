@@ -28,8 +28,8 @@ const config = { resultado: { label: "Resultado" } } satisfies ChartConfig;
 /**
  * Gráfico geral (donut) da Home: o RESULTADO de cada caixa como fatia.
 
- * Os CARDS dos caixas ficam à esquerda como legenda compacta (cada um com a
- * bolinha da cor da sua fatia) e o donut fica à direita. Clicar em um card abre o caixa.
+ * O donut fica à esquerda e os CARDS dos caixas ficam à direita como quadradinhos
+ * compactos (cada um com a bolinha da cor da sua fatia). Clicar em um card abre o caixa.
  */
 export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: HomeDonutChartProps) {
   const byList = useMemo(() => totalsByList(entries), [entries]);
@@ -90,64 +90,11 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
         </span>
       </header>
 
-      {/* Cards dos caixas (legenda) à esquerda + donut à direita */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <ul className="flex w-full flex-col gap-2">
-          {data.map((d, index) => {
-            const s = byList[d.id] ?? {
-              income: 0,
-              expense: 0,
-              balance: 0,
-              count: 0,
-            };
-            return (
-              <li key={d.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpenList?.(d.id)}
-                  aria-label={`Abrir caixa ${d.name}`}
-                  className="group flex w-full items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-2 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
-                >
-                  <span
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{
-                      background: DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0],
-                    }}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-semibold leading-tight">{d.name}</span>
-                    <span className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground/70">
-                      <span className="inline-flex items-center gap-1">
-                        <TrendingUp className="size-3 text-income" />
-                        {brlCompact(s.income)}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <TrendingDown className="size-3 text-expense" />
-                        {brlCompact(s.expense)}
-                      </span>
-                    </span>
-                  </span>
-                  <span
-                    className={cn(
-                      "shrink-0 font-[family-name:var(--font-display)] text-xs font-bold tabular-nums leading-tight",
-                      s.balance < 0
-                        ? "text-expense"
-                        : s.balance > 0
-                          ? "text-income"
-                          : "text-muted-foreground/60",
-                    )}
-                  >
-                    {s.balance >= 0 ? "+" : "−"} {brlCompact(Math.abs(s.balance))}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-
-        {/* Donut à direita */}
-        <div className="flex justify-center lg:justify-end">
-          <div className="relative size-44 sm:size-52 lg:size-56">
+      {/* Donut à esquerda + cards dos caixas (quadradinhos) à direita */}
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-end lg:gap-8">
+        {/* Donut à esquerda (no desktop) */}
+        <div className="flex justify-center">
+          <div className="relative size-44 sm:size-48 lg:size-52">
             {totalAbs > 0 ? (
               <ChartContainer config={config} className="aspect-auto size-full">
                 <PieChart>
@@ -201,6 +148,60 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
             </div>
           </div>
         </div>
+
+        {/* Cards dos caixas (quadradinhos) à direita */}
+        <ul className="grid w-full grid-cols-3 gap-2 sm:grid-cols-4 lg:w-auto lg:grid-cols-3 lg:justify-items-center">
+          {data.map((d, index) => {
+            const s = byList[d.id] ?? {
+              income: 0,
+              expense: 0,
+              balance: 0,
+              count: 0,
+            };
+            return (
+              <li key={d.id} className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => onOpenList?.(d.id)}
+                  aria-label={`Abrir caixa ${d.name}`}
+                  className="group flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-xl border border-border bg-card px-1.5 py-2 text-center shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
+                >
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{
+                      background: DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0],
+                    }}
+                  />
+                  <span className="block w-full truncate text-[11px] font-semibold leading-tight">
+                    {d.name}
+                  </span>
+                  <span
+                    className={cn(
+                      "block w-full truncate font-[family-name:var(--font-display)] text-xs font-bold tabular-nums leading-tight",
+                      s.balance < 0
+                        ? "text-expense"
+                        : s.balance > 0
+                          ? "text-income"
+                          : "text-muted-foreground/60",
+                    )}
+                  >
+                    {s.balance >= 0 ? "+" : "−"} {brlCompact(Math.abs(s.balance))}
+                  </span>
+                  <span className="flex w-full items-center justify-center gap-2 text-[10px] text-muted-foreground/70">
+                    <span className="inline-flex items-center gap-0.5">
+                      <TrendingUp className="size-2.5 text-income" />
+                      {brlCompact(s.income)}
+                    </span>
+                    <span className="inline-flex items-center gap-0.5">
+                      <TrendingDown className="size-2.5 text-expense" />
+                      {brlCompact(s.expense)}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );
