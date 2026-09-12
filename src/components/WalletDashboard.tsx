@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Check, FileText, Lock, Pencil, X } from "lucide-react";
 import {
   filterByPeriod,
@@ -11,7 +11,6 @@ import {
 } from "@/lib/caixa";
 import type { NewEntry } from "@/hooks/use-caixa";
 import { EntryRow } from "./EntryRow";
-import { FlowChart } from "./FlowChart";
 import { StatementView } from "./StatementView";
 import { TransactionForm } from "./TransactionForm";
 import { WalletSummary } from "./WalletSummary";
@@ -33,6 +32,10 @@ interface WalletDashboardProps {
 }
 
 const RECENT_LIMIT = 6;
+
+// A biblioteca de gráficos é pesada: só é baixada quando o gráfico aparece,
+// depois da primeira pintura. Em celular fraco isso adianta o app na tela.
+const FlowChart = lazy(() => import("./FlowChart").then((m) => ({ default: m.FlowChart })));
 
 export function WalletDashboard({
   list,
@@ -172,7 +175,13 @@ export function WalletDashboard({
                 period={period}
                 onPeriodChange={setPeriod}
               />
-              <FlowChart data={series} listName={list.name} />
+              <Suspense
+                fallback={
+                  <div className="h-64 animate-pulse rounded-2xl border border-border bg-card" />
+                }
+              >
+                <FlowChart data={series} listName={list.name} />
+              </Suspense>
             </div>
 
             <div className="flex flex-col gap-4 lg:sticky lg:top-4">

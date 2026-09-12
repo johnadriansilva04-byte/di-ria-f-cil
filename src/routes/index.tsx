@@ -275,7 +275,7 @@ function Dashboard({ session }: { session: Session }) {
       {mobileSidebarOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/70"
             onClick={() => setMobileSidebarOpen(false)}
           />
           <div className="relative z-50 h-full w-72 max-w-[85vw]">

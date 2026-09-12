@@ -1,4 +1,4 @@
-const CACHE_NAME = "caixa-dia-v2";
+const CACHE_NAME = "easy-account-v3";
 const PRECACHE = [
   "/manifest.webmanifest",
   "/favicon.png",
@@ -6,9 +6,11 @@ const PRECACHE = [
   "/icons/icon-512.png",
 ];
 
-// Só imagens/manifest entram no cache. Scripts e páginas ficam com a rede,
-// para o app nunca mostrar uma versão velha.
+// Imagens/manifest entram no cache sempre. Arquivos do build em /assets/ têm
+// hash no nome (conteúdo novo = nome novo), então podem vir do cache sem
+// risco de mostrar versão velha — é o que deixa o segundo acesso instantâneo.
 const CACHEABLE = /\.(png|jpg|jpeg|svg|webp|ico|woff2?|webmanifest)$/;
+const HASHED_ASSET = /^\/assets\/.+\.(js|css)$/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -57,7 +59,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (!CACHEABLE.test(url.pathname)) return;
+  if (!CACHEABLE.test(url.pathname) && !HASHED_ASSET.test(url.pathname)) return;
 
   event.respondWith(
     (async () => {

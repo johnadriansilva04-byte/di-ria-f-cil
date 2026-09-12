@@ -3,7 +3,6 @@ import { ArrowRight, BarChart3, Layers, Loader2, Lock, Phone, Plus } from "lucid
 import { supabase } from "@/integrations/supabase/client";
 import { brl, maskPhone, onlyDigits, phoneToEmail, type MonthPoint } from "@/lib/caixa";
 import { BrandLockup } from "@/components/Brand";
-import { FlowBars } from "@/components/FlowChart";
 import { cn } from "@/lib/utils";
 
 type Mode = "entrar" | "criar";
@@ -24,22 +23,32 @@ const PREVIEW: MonthPoint[] = [
   { key: "m6", label: "Set", income: 8200, expense: 3160 },
 ];
 
-function useCountUp(target: number, duration: number, delay = 0): number {
-  const [value, setValue] = useState(0);
+/**
+ * Contadores da maquete: um único requestAnimationFrame para os três números
+ * (três loops separados custariam 3x mais quadros em celular fraco).
+ */
+function usePreviewNumbers(delay = 320, duration = 1100) {
+  const [values, setValues] = useState({ balance: 0, income: 0, expense: 0 });
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setValue(target);
+      setValues({ balance: 5040, income: 8200, expense: 3160 });
       return undefined;
     }
+
     let frame = 0;
     let startedAt = 0;
     const timer = window.setTimeout(() => {
       const step = (now: number) => {
         if (!startedAt) startedAt = now;
         const progress = Math.min(1, (now - startedAt) / duration);
-        setValue(target * (1 - Math.pow(1 - progress, 3)));
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setValues({
+          balance: 5040 * eased,
+          income: 8200 * eased,
+          expense: 3160 * eased,
+        });
         if (progress < 1) frame = window.requestAnimationFrame(step);
       };
       frame = window.requestAnimationFrame(step);
@@ -49,19 +58,48 @@ function useCountUp(target: number, duration: number, delay = 0): number {
       window.clearTimeout(timer);
       window.cancelAnimationFrame(frame);
     };
-  }, [target, duration, delay]);
+  }, [delay, duration]);
 
-  return value;
+  return values;
+}
+
+/** Barras leves (CSS puro): a entrada não carrega biblioteca de gráfico. */
+function MiniBars({ data }: { data: MonthPoint[] }) {
+  const max = Math.max(...data.flatMap((d) => [d.income, d.expense]), 1);
+
+  return (
+    <div className="flex h-24 items-end justify-between gap-1.5 sm:h-28">
+      {data.map((point, index) => (
+        <div key={point.key} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+          <div className="flex h-full w-full items-end justify-center gap-[3px]">
+            <span
+              className="ea-bar w-1/3 rounded-t-[3px] bg-income"
+              style={{
+                height: `${(point.income / max) * 100}%`,
+                animationDelay: `${620 + index * 60}ms`,
+              }}
+            />
+            <span
+              className="ea-bar w-1/3 rounded-t-[3px] bg-expense"
+              style={{
+                height: `${(point.expense / max) * 100}%`,
+                animationDelay: `${660 + index * 60}ms`,
+              }}
+            />
+          </div>
+          <span className="text-[10px] text-muted-foreground/60">{point.label}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /** Maquete viva do app: mostra o saldo subindo, os números e o gráfico desenhando. */
 function ProductPreview() {
-  const balance = useCountUp(5040, 1100, 320);
-  const income = useCountUp(8200, 1000, 420);
-  const expense = useCountUp(3160, 1000, 500);
+  const { balance, income, expense } = usePreviewNumbers();
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-border bg-card/80 p-4 shadow-2xl backdrop-blur-sm sm:p-5">
+    <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-4 shadow-xl sm:p-5">
       <div className="flex items-center justify-between gap-3">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
           <span className="size-1.5 rounded-full bg-primary" />
@@ -99,7 +137,7 @@ function ProductPreview() {
       </div>
 
       <div className="mt-3 rounded-2xl border border-border/70 bg-background/40 p-2">
-        <FlowBars data={PREVIEW} compact />
+        <MiniBars data={PREVIEW} />
       </div>
 
       {/* lançamento chegando: mostra que é tudo digitado por você */}
@@ -175,11 +213,16 @@ export function EntryScreen() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background">
-      {/* fundo em camadas */}
-      <div aria-hidden className="ea-fade pointer-events-none absolute inset-0">
-        <div className="ea-glow absolute -left-32 -top-28 size-[26rem] rounded-full bg-primary/15 blur-3xl" />
-        <div className="ea-glow absolute -bottom-40 -right-24 size-[30rem] rounded-full bg-income/10 blur-3xl" />
-      </div>
+      {/* fundo em camadas (gradiente estático: sem blur animado, que pesa no GPU) */}
+      <div
+        aria-hidden
+        className="ea-fade pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(60% 45% at 8% 0%, oklch(0.65 0.12 255 / 0.16), transparent 70%)," +
+            "radial-gradient(55% 40% at 100% 100%, oklch(0.72 0.14 155 / 0.12), transparent 70%)",
+        }}
+      />
 
       <div className="relative mx-auto grid w-full max-w-6xl grid-cols-1 gap-8 px-5 py-10 lg:grid-cols-[1.05fr_minmax(0,400px)] lg:items-start lg:gap-x-14 lg:gap-y-8 lg:py-16">
         {/* Abertura */}
@@ -219,7 +262,7 @@ export function EntryScreen() {
             <button
               type="button"
               onClick={() => focusForm("criar")}
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card/70 px-5 py-3 text-sm font-bold backdrop-blur-sm transition-colors hover:border-primary/40 hover:text-primary active:scale-[0.98]"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-5 py-3 text-sm font-bold transition-colors hover:border-primary/40 hover:text-primary active:scale-[0.98]"
             >
               Começar agora
             </button>
@@ -324,7 +367,7 @@ export function EntryScreen() {
             {PILLARS.map(({ Icon, title, text }, index) => (
               <li
                 key={title}
-                className="ea-up rounded-2xl border border-border bg-card/70 p-4 backdrop-blur-sm"
+                className="ea-up rounded-2xl border border-border bg-card p-4"
                 style={{ animationDelay: `${300 + index * 70}ms` }}
               >
                 <span className="flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary">

@@ -34,7 +34,11 @@ export function WalletSummary({ listName, totals, period, onPeriodChange }: Wall
       <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-16 -top-20 size-48 rounded-full bg-primary/15 blur-3xl"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(45% 120% at 100% 0%, oklch(0.65 0.12 255 / 0.14), transparent 70%)",
+          }}
         />
         <div className="relative flex items-center gap-2">
           <div className="flex size-7 items-center justify-center rounded-lg bg-primary/15 text-primary">

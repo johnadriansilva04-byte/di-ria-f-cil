@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Check, Loader2, Pencil, Trash2, X } from "lucide-react";
 import {
   brl,
@@ -23,7 +23,7 @@ interface EntryRowProps {
 const inputClass =
   "w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring/30";
 
-export function EntryRow({ entry, lists, onSave, onDelete, onError }: EntryRowProps) {
+function EntryRowBase({ entry, lists, onSave, onDelete, onError }: EntryRowProps) {
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -231,3 +231,6 @@ export function EntryRow({ entry, lists, onSave, onDelete, onError }: EntryRowPr
     </li>
   );
 }
+
+/** memo: editar ou apagar um lançamento não redesenha todos os outros. */
+export const EntryRow = memo(EntryRowBase);

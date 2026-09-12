@@ -6,7 +6,8 @@
 
 @theme {
   --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  /* Corpo usa a fonte do sistema: zero download e renderiza antes */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --color-income: var(--income);
   --color-income-foreground: var(--income-foreground);
   --color-expense: var(--expense);
@@ -253,7 +254,7 @@
   .ea-fade,
   .ea-up,
   .ea-pop,
-  .ea-glow {
+  .ea-bar {
     animation-duration: 1ms;
   }
 }
@@ -297,15 +298,14 @@
   }
 }
 
-@keyframes ea-glow {
-  0%,
-  100% {
-    opacity: 0.45;
-    transform: scale(1);
+@keyframes ea-bar {
+  from {
+    transform: scaleY(0.06);
+    opacity: 0.35;
   }
-  50% {
-    opacity: 0.85;
-    transform: scale(1.06);
+  to {
+    transform: scaleY(1);
+    opacity: 1;
   }
 }
 
@@ -321,6 +321,7 @@
   animation: ea-pop 620ms cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
 }
 
-.ea-glow {
-  animation: ea-glow 7s ease-in-out infinite;
+.ea-bar {
+  animation: ea-bar 520ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  transform-origin: bottom;
 }

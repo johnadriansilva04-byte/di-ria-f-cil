@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Search } from "lucide-react";
 import {
   brl,
@@ -26,6 +26,8 @@ interface StatementViewProps {
 
 type Filter = "todos" | Kind;
 
+const CHUNK = 50;
+
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "todos", label: "Tudo" },
   { id: "entrada", label: "Entradas" },
@@ -44,6 +46,12 @@ export function StatementView({
 }: StatementViewProps) {
   const [filter, setFilter] = useState<Filter>("todos");
   const [query, setQuery] = useState("");
+  // Listas longas são desenhadas em pedaços: celular fraco não engasga.
+  const [visible, setVisible] = useState(CHUNK);
+
+  useEffect(() => {
+    setVisible(CHUNK);
+  }, [filter, query]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -65,6 +73,21 @@ export function StatementView({
     }
     return Array.from(map.entries());
   }, [filtered]);
+
+  // Só os lançamentos mais recentes entram na tela até o usuário pedir mais.
+  const shown = useMemo(() => {
+    const result: [string, Entry[]][] = [];
+    let count = 0;
+    for (const [date, dayEntries] of groups) {
+      if (count >= visible) break;
+      const slice = dayEntries.slice(0, visible - count);
+      result.push([date, slice]);
+      count += slice.length;
+    }
+    return result;
+  }, [groups, visible]);
+
+  const hidden = filtered.length - Math.min(visible, filtered.length);
 
   return (
     <div className="flex h-full flex-col">
@@ -135,11 +158,11 @@ export function StatementView({
             </p>
           </div>
         ) : (
-          groups.map(([date, dayEntries]) => {
+          shown.map(([date, dayEntries]) => {
             const day = totalsOf(dayEntries);
             return (
               <section key={date}>
-                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/95 px-4 py-2 backdrop-blur sm:px-6">
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-4 py-2 sm:px-6">
                   <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {friendlyDate(date)} <span className="font-normal">· {dayLabel(date)}</span>
                   </p>
@@ -168,6 +191,18 @@ export function StatementView({
             );
           })
         )}
+
+        {hidden > 0 ? (
+          <div className="px-4 py-4 text-center sm:px-6">
+            <button
+              type="button"
+              onClick={() => setVisible((prev) => prev + CHUNK)}
+              className="rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+            >
+              Mostrar mais {Math.min(CHUNK, hidden)} de {hidden} lançamento(s)
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <footer className="grid grid-cols-3 gap-3 border-t border-border bg-card px-4 py-3 sm:px-6">
