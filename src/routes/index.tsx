@@ -264,7 +264,7 @@ function Dashboard({ session }: { session: Session }) {
   }, [caixa.loading]);
 
   // Som + animação de confirmação: verde no ganho, vermelho no gasto.
-  const handleLaunched = (entry: Entry) => {
+  const handleLaunched = (entry: Entry, { celebrate = true }: { celebrate?: boolean } = {}) => {
     if (entry.kind === "entrada") playGain();
     else playSpend();
     setFx({
@@ -276,6 +276,7 @@ function Dashboard({ session }: { session: Session }) {
 
     // Celebração de dia: primeiro ganho do dia = meta diária batida.
     // Usa os lançamentos + o recém-criado (o estado ainda não atualizou).
+    if (!celebrate) return;
     const g = gamificationState([...caixa.entries, entry]);
     if (entry.kind === "entrada") {
       if (grantedStreak !== g.streak) {
@@ -523,11 +524,31 @@ function Dashboard({ session }: { session: Session }) {
       ) : null}
       <OnboardingTour
         open={tourOpen}
+        activeListId={caixa.activeListId}
+        lists={caixa.lists}
         onClose={() => setTourOpen(false)}
         onComplete={() => {
           markTourSeen();
           setTourOpen(false);
         }}
+        onCreateList={async (name) => {
+          const list = await caixa.addList(name);
+          return list;
+        }}
+        onOpenList={(id) => {
+          setView("lista");
+          caixa.selectList(id);
+        }}
+        onCreateEntry={async (input) => {
+          setActionError(null);
+          const entry = await caixa.addEntry(input);
+          // Mesma confirmação de um lançamento real: som + animação verde
+          // (mas sem a celebração de metas, para não atrapalhar o tutorial).
+          handleLaunched(entry, { celebrate: false });
+          return entry;
+        }}
+        onDeleteEntry={(id) => caixa.removeEntry(id)}
+        onDeleteList={(id) => caixa.removeList(id)}
       />
     </div>
   );
