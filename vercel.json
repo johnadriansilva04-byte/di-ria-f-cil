@@ -1,15 +1,8 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": ".start",
-  "devCommand": "npm run dev",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
   "installCommand": "npm install",
-  "framework": "vite",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/.start/server/$1"
-    }
-  ],
+  "buildCommand": "npm run build",
   "headers": [
     {
       "source": "/sw.js",
