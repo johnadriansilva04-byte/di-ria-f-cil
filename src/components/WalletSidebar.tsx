@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, LogOut, Menu, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Home, LogOut, Menu, Pencil, Plus, Trash2, X } from "lucide-react";
 import { brl, brlCompact, type Totals, type WalletList } from "@/lib/caixa";
 import { BrandLockup } from "@/components/Brand";
 import { cn } from "@/lib/utils";
@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils";
 interface WalletSidebarProps {
   lists: WalletList[];
   activeListId: string | null;
+  homeActive?: boolean;
   summaries: Record<string, Totals>;
+  onGoHome?: () => void;
   onSelectList: (id: string) => void;
   onCreate: (name: string) => Promise<void>;
   onRename: (id: string, name: string) => Promise<void>;
@@ -25,7 +27,9 @@ const inlineInput =
 export function WalletSidebar({
   lists,
   activeListId,
+  homeActive = false,
   summaries,
+  onGoHome,
   onSelectList,
   onCreate,
   onRename,
@@ -108,6 +112,21 @@ export function WalletSidebar({
           <Menu className="size-5" />
         </button>
         <div className="flex flex-1 flex-col items-center gap-1.5 overflow-y-auto">
+          <button
+            type="button"
+            onClick={onGoHome}
+            title="Visão geral"
+            aria-label="Visão geral"
+            aria-pressed={homeActive}
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+              homeActive
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+            )}
+          >
+            <Home className="size-5" />
+          </button>
           {lists.map((list) => (
             <button
               key={list.id}
@@ -163,7 +182,23 @@ export function WalletSidebar({
 
       {/* Listas */}
       <div className="flex-1 overflow-y-auto px-2 py-3">
-        <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+        <button
+          type="button"
+          onClick={onGoHome}
+          aria-pressed={homeActive}
+          className={cn(
+            "mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors",
+            homeActive
+              ? "bg-sidebar-primary/15 text-sidebar-primary"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+          )}
+        >
+          <Home className="size-4 shrink-0" />
+          <span className={cn("truncate text-sm", homeActive ? "font-semibold" : "font-medium")}>
+            Visão geral
+          </span>
+        </button>
+        <p className="mb-2 mt-3 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
           Minhas listas
         </p>
         <ul className="space-y-0.5">

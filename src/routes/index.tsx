@@ -1,12 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Download, PanelLeftOpen, RefreshCw, Volume2, VolumeX, X } from "lucide-react";
+import {
+  Download,
+  LayoutDashboard,
+  PanelLeftOpen,
+  RefreshCw,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { BrandMark } from "@/components/Brand";
 import { EntryScreen } from "@/components/EntryScreen";
 import { WalletSidebar } from "@/components/WalletSidebar";
 import { WalletDashboard } from "@/components/WalletDashboard";
+import { HomeOverview } from "@/components/HomeOverview";
 import { LaunchFeedback, type LaunchFx } from "@/components/LaunchFeedback";
 import {
   isSoundEnabled,
@@ -18,6 +27,7 @@ import {
 } from "@/lib/sfx";
 import { useCaixa } from "@/hooks/use-caixa";
 import type { Entry } from "@/lib/caixa";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -209,11 +219,24 @@ function Dashboard({ session }: { session: Session }) {
   const telefone = (session.user.user_metadata?.["telefone"] as string | undefined) ?? "";
   const caixa = useCaixa(userId);
 
+  const [view, setView] = useState<"home" | "lista">("home");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [fx, setFx] = useState<LaunchFx | null>(null);
   const [sound, setSound] = useState(true);
+
+  const handleGoHome = () => {
+    setView("home");
+    setMobileSidebarOpen(false);
+    setActionError(null);
+  };
+
+  // Sem lista ativa (ex: apagou a única lista), a Home volta a ser a tela.
+
+  useEffect(() => {
+    if (!caixa.activeListId) setView("home");
+  }, [caixa.activeListId]);
 
   useEffect(() => {
     setSound(isSoundEnabled());
@@ -245,6 +268,7 @@ function Dashboard({ session }: { session: Session }) {
 
   const handleSelectList = (id: string) => {
     caixa.selectList(id);
+    setView("lista");
     setMobileSidebarOpen(false);
     setActionError(null);
   };
@@ -256,10 +280,13 @@ function Dashboard({ session }: { session: Session }) {
         <WalletSidebar
           lists={caixa.lists}
           activeListId={caixa.activeListId}
+          homeActive={view === "home"}
           summaries={caixa.summaries}
+          onGoHome={handleGoHome}
           onSelectList={handleSelectList}
           onCreate={async (name) => {
             await caixa.addList(name);
+            setView("lista");
           }}
           onRename={caixa.editList}
           onDelete={caixa.removeList}
@@ -282,10 +309,13 @@ function Dashboard({ session }: { session: Session }) {
             <WalletSidebar
               lists={caixa.lists}
               activeListId={caixa.activeListId}
+              homeActive={view === "home"}
               summaries={caixa.summaries}
+              onGoHome={handleGoHome}
               onSelectList={handleSelectList}
               onCreate={async (name) => {
                 await caixa.addList(name);
+                setView("lista");
               }}
               onRename={caixa.editList}
               onDelete={caixa.removeList}
@@ -301,7 +331,7 @@ function Dashboard({ session }: { session: Session }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Barra superior */}
-        <div className="flex items-center gap-3 border-b border-border bg-background px-4 py-3">
+        <div className="flex items-center gap-2 border-b border-border bg-background px-4 py-3 sm:gap-3">
           {sidebarCollapsed ? (
             <button
               type="button"
@@ -320,8 +350,25 @@ function Dashboard({ session }: { session: Session }) {
           >
             <PanelLeftOpen className="size-5" />
           </button>
+          <button
+            type="button"
+            onClick={handleGoHome}
+            aria-pressed={view === "home"}
+            aria-label="Visão geral"
+            title="Visão geral"
+            className={cn(
+              "flex shrink-0 items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors",
+              view === "home"
+                ? "bg-primary/10 font-semibold text-primary"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+            )}
+          >
+            <LayoutDashboard className="size-4" />
+            <span className="hidden sm:inline">Visão geral</span>
+          </button>
+          <div className="h-5 w-px bg-border" />
           <span className="min-w-0 flex-1 truncate font-[family-name:var(--font-display)] text-sm font-semibold">
-            {caixa.activeList ? caixa.activeList.name : "Caixa"}
+            {view === "home" ? "Easy Account" : caixa.activeList ? caixa.activeList.name : "Caixa"}
           </span>
           <button
             type="button"
@@ -360,7 +407,15 @@ function Dashboard({ session }: { session: Session }) {
 
         {/* Conteúdo */}
         <div className="min-h-0 flex-1">
-          {caixa.activeList ? (
+          {view === "home" ? (
+            <HomeOverview
+              lists={caixa.lists}
+              entries={caixa.entries}
+              loading={caixa.loading}
+              onOpenList={handleSelectList}
+              onOpenSidebar={() => setMobileSidebarOpen(true)}
+            />
+          ) : caixa.activeList ? (
             <WalletDashboard
               key={caixa.activeList.id}
               list={caixa.activeList}
