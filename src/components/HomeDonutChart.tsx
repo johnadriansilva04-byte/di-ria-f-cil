@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
 import { Cell, Pie, PieChart, Tooltip } from "recharts";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
@@ -25,12 +25,41 @@ const DONUT_PALETTE = [
 
 const config = { resultado: { label: "Resultado" } } satisfies ChartConfig;
 
+/** Mini-gráfico animado do card: alterna Recebido (seta pra cima) e Gasto (seta pra baixo). */
+function CaixaSparkline({ income, expense }: { income: number; expense: number }) {
+  const [showIncome, setShowIncome] = useState(true);
+  useEffect(() => {
+    const id = setInterval(() => setShowIncome((v) => !v), 2100);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span className="relative mt-1 block h-3.5 overflow-hidden text-[10px] tabular-nums leading-none">
+      <span
+        className={cn(
+          "absolute inset-x-0 top-0 inline-flex items-center gap-1 text-income transition-all duration-500",
+          showIncome ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-40",
+        )}
+      >
+        <TrendingUp className="size-2.5" />
+        {brlCompact(income)}
+      </span>
+      <span
+        className={cn(
+          "absolute inset-x-0 top-0 inline-flex items-center gap-1 text-expense transition-all duration-500",
+          showIncome ? "translate-y-2 opacity-40" : "translate-y-0 opacity-100",
+        )}
+      >
+        <TrendingDown className="size-2.5" />
+        {brlCompact(expense)}
+      </span>
+    </span>
+  );
+}
+
 /**
- * Gráfico geral (donut) da Home: o RESULTADO de cada caixa como fatia.
-
- * O donut fica em cima e os CARDS dos caixas sao a propria legenda,
- * cada um com a bolinha da cor da sua fatia. Clicar em um card abre o caixa.
-
+ * Gráfico geral (donut) da Home: o RESULTADO de cada caixa como fatia..
+ * Cards compactos dos caixas na esquerda servem de legenda (com mini-gráfico
+ * animado de recebido/gasto) e o donut fica na direita..
  */
 export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: HomeDonutChartProps) {
   const byList = useMemo(() => totalsByList(entries), [entries]);
@@ -91,117 +120,112 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
         </span>
       </header>
 
-      {/* Donut em cima */}
-      <div className="flex justify-center">
-        <div className="relative size-48 sm:size-56">
-          {totalAbs > 0 ? (
-            <ChartContainer config={config} className="aspect-auto size-full">
-              <PieChart>
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--card)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 12,
-                    fontSize: 12,
-                    color: "var(--foreground)",
-                  }}
-                  formatter={(value) => brl(Number(value))}
-                />
-                <Pie
-                  data={data}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius="70%"
-                  outerRadius="100%"
-                  paddingAngle={3}
-                  strokeWidth={0}
+      {/* Cards compactos (legenda) na esquerda + donut na direita */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <ul className="flex w-full flex-col gap-1.5">
+          {data.map((d, index) => {
+            const s = byList[d.id] ?? {
+              income: 0,
+              expense: 0,
+              balance: 0,
+              count: 0,
+            };
+            return (
+              <li key={d.id}>
+                <button
+                  type="button"
+                  onClick={() => onOpenList?.(d.id)}
+                  aria-label={`Abrir caixa ${d.name}`}
+                  className="group flex w-full items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-1.5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
                 >
-                  {data.map((d, index) => (
-                    <Cell
-                      key={d.id}
-                      fill={DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0]}
-                    />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ChartContainer>
-          ) : (
-            <div aria-hidden className="size-full rounded-full border-[14px] border-border/40" />
-          )}
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-              Resultado geral
-            </span>
-            <span
-              className={cn(
-                "mt-0.5 font-[family-name:var(--font-display)] text-lg font-bold tabular-nums sm:text-xl",
-                totalBalance < 0
-                  ? "text-expense"
-                  : totalBalance > 0
-                    ? "text-income"
-                    : "text-muted-foreground/60",
-              )}
-            >
-              {totalBalance >= 0 ? "+" : "−"} {brl(Math.abs(totalBalance))}
-            </span>
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{
+                      background: DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0],
+                    }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-semibold leading-tight">
+                      {d.name}
+                    </span>
+                    <CaixaSparkline income={s.income} expense={s.expense} />
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 text-[13px] font-bold tabular-nums",
+                      s.balance < 0
+                        ? "text-expense"
+                        : s.balance > 0
+                          ? "text-income"
+                          : "text-muted-foreground/60",
+                    )}
+                  >
+                    {s.balance >= 0 ? "+" : "−"} {brl(Math.abs(s.balance))}
+                  </span>
+                  <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        {/* Donut na direita */}
+        <div className="flex justify-center lg:justify-end">
+          <div className="relative size-44 sm:size-52 lg:size-56">
+            {totalAbs > 0 ? (
+              <ChartContainer config={config} className="aspect-auto size-full">
+                <PieChart>
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--card)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 12,
+                      fontSize: 12,
+                      color: "var(--foreground)",
+                    }}
+                    formatter={(value) => brl(Number(value))}
+                  />
+                  <Pie
+                    data={data}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius="70%"
+                    outerRadius="100%"
+                    paddingAngle={3}
+                    strokeWidth={0}
+                  >
+                    {data.map((d, index) => (
+                      <Cell
+                        key={d.id}
+                        fill={DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0]}
+                      />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ChartContainer>
+            ) : (
+              <div aria-hidden className="size-full rounded-full border-[14px] border-border/40" />
+            )}
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                Resultado geral
+              </span>
+              <span
+                className={cn(
+                  "mt-0.5 font-[family-name:var(--font-display)] text-lg font-bold tabular-nums sm:text-xl",
+                  totalBalance < 0
+                    ? "text-expense"
+                    : totalBalance > 0
+                      ? "text-income"
+                      : "text-muted-foreground/60",
+                )}
+              >
+                {totalBalance >= 0 ? "+" : "−"} {brl(Math.abs(totalBalance))}
+              </span>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Legenda = cards dos caixas */}
-      <ul className="mt-5 grid w-full gap-2 sm:grid-cols-2">
-        {data.map((d, index) => {
-          const s = byList[d.id] ?? {
-            income: 0,
-            expense: 0,
-            balance: 0,
-            count: 0,
-          };
-          return (
-            <li key={d.id}>
-              <button
-                type="button"
-                onClick={() => onOpenList?.(d.id)}
-                aria-label={`Abrir caixa ${d.name}`}
-                className="group flex w-full items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
-              >
-                <span
-                  className="size-3 shrink-0 rounded-full"
-                  style={{
-                    background: DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0],
-                  }}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{d.name}</span>
-                  <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground/70">
-                    <span className="inline-flex items-center gap-1">
-                      <TrendingUp className="size-3 text-income" />
-                      {brlCompact(s.income)}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <TrendingDown className="size-3 text-expense" />
-                      {brlCompact(s.expense)}
-                    </span>
-                  </span>
-                </span>
-                <span
-                  className={cn(
-                    "shrink-0 font-[family-name:var(--font-display)] text-sm font-bold tabular-nums",
-                    s.balance < 0
-                      ? "text-expense"
-                      : s.balance > 0
-                        ? "text-income"
-                        : "text-muted-foreground/60",
-                  )}
-                >
-                  {s.balance >= 0 ? "+" : "−"} {brl(Math.abs(s.balance))}
-                </span>
-                <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
     </section>
   );
 }
