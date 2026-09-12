@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronDown, ChevronUp, TrendingDown, TrendingUp } from "lucide-react";
 import { Cell, Pie, PieChart, Tooltip } from "recharts";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { brl, brlCompact, totalsByList, type Entry, type WalletList } from "@/lib/caixa";
@@ -25,13 +25,18 @@ const DONUT_PALETTE = [
 
 const config = { resultado: { label: "Resultado" } } satisfies ChartConfig;
 
+/** Nº máximo de cards visíveis sem expandir (grade 3x3 = 9, mas mostra 6 antes do "Ver mais"). */
+const VISIBLE_CARDS = 6;
+
 /**
  * Gráfico geral (donut) da Home: o RESULTADO de cada caixa como fatia.
 
- * O donut fica à esquerda e os CARDS dos caixas ficam à direita como quadradinhos
- * compactos (cada um com a bolinha da cor da sua fatia). Clicar em um card abre o caixa.
+ * O donut fica fixo à esquerda e os CARDS dos caixas formam uma grade 3x3
+ * à direita (cada um com a bolinha da cor da sua fatia). Mostra até 6 cards;
+ * com 7+ aparece "Ver mais" que expande a grade. Clicar em um card abre o caixa.
  */
 export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: HomeDonutChartProps) {
+  const [expanded, setExpanded] = useState(false);
   const byList = useMemo(() => totalsByList(entries), [entries]);
   const data = useMemo(
     () =>
@@ -45,6 +50,8 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
 
   const totalAbs = data.reduce((sum, d) => sum + d.value, 0);
   const totalBalance = lists.reduce((sum, l) => sum + (byList[l.id]?.balance ?? 0), 0);
+  const showMore = data.length > VISIBLE_CARDS;
+  const shown = showMore && !expanded ? data.slice(0, VISIBLE_CARDS) : data;
 
   if (lists.length === 0) {
     return (
@@ -90,11 +97,11 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
         </span>
       </header>
 
-      {/* Donut à esquerda + cards dos caixas (quadradinhos) à direita */}
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-end lg:gap-8">
-        {/* Donut à esquerda (no desktop) */}
-        <div className="flex justify-center">
-          <div className="relative size-44 sm:size-48 lg:size-52">
+      {/* Donut fixo à esquerda + cards dos caixas (grid 3 colunas) à direita */}
+      <div className="flex flex-col items-center gap-5 lg:flex-row lg:items-start lg:gap-8">
+        {/* Donut à esquerda */}
+        <div className="shrink-0">
+          <div className="relative size-44 sm:size-48 lg:size-56">
             {totalAbs > 0 ? (
               <ChartContainer config={config} className="aspect-auto size-full">
                 <PieChart>
@@ -149,59 +156,79 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
           </div>
         </div>
 
-        {/* Cards dos caixas (quadradinhos) à direita */}
-        <ul className="grid w-full grid-cols-3 gap-2 sm:grid-cols-4 lg:w-auto lg:grid-cols-3 lg:justify-items-center">
-          {data.map((d, index) => {
-            const s = byList[d.id] ?? {
-              income: 0,
-              expense: 0,
-              balance: 0,
-              count: 0,
-            };
-            return (
-              <li key={d.id} className="min-w-0">
-                <button
-                  type="button"
-                  onClick={() => onOpenList?.(d.id)}
-                  aria-label={`Abrir caixa ${d.name}`}
-                  className="group flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-xl border border-border bg-card px-1.5 py-2 text-center shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
-                >
-                  <span
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{
-                      background: DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0],
-                    }}
-                  />
-                  <span className="block w-full truncate text-[11px] font-semibold leading-tight">
-                    {d.name}
-                  </span>
-                  <span
-                    className={cn(
-                      "block w-full truncate font-[family-name:var(--font-display)] text-xs font-bold tabular-nums leading-tight",
-                      s.balance < 0
-                        ? "text-expense"
-                        : s.balance > 0
-                          ? "text-income"
-                          : "text-muted-foreground/60",
-                    )}
+        {/* Cards dos caixas: grade de 3 colunas à direita */}
+        <div className="w-full min-w-0 lg:w-auto">
+          <ul className="grid w-full grid-cols-3 gap-2">
+            {shown.map((d, index) => {
+              const s = byList[d.id] ?? {
+                income: 0,
+                expense: 0,
+                balance: 0,
+                count: 0,
+              };
+              return (
+                <li key={d.id} className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => onOpenList?.(d.id)}
+                    aria-label={`Abrir caixa ${d.name}`}
+                    className="group flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-xl border border-border bg-card px-1.5 py-2 text-center shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
                   >
-                    {s.balance >= 0 ? "+" : "−"} {brlCompact(Math.abs(s.balance))}
-                  </span>
-                  <span className="flex w-full items-center justify-center gap-2 text-[10px] text-muted-foreground/70">
-                    <span className="inline-flex items-center gap-0.5">
-                      <TrendingUp className="size-2.5 text-income" />
-                      {brlCompact(s.income)}
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{
+                        background: DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0],
+                      }}
+                    />
+                    <span className="block w-full truncate text-[11px] font-semibold leading-tight">
+                      {d.name}
                     </span>
-                    <span className="inline-flex items-center gap-0.5">
-                      <TrendingDown className="size-2.5 text-expense" />
-                      {brlCompact(s.expense)}
+                    <span
+                      className={cn(
+                        "block w-full truncate font-[family-name:var(--font-display)] text-xs font-bold tabular-nums leading-tight",
+                        s.balance < 0
+                          ? "text-expense"
+                          : s.balance > 0
+                            ? "text-income"
+                            : "text-muted-foreground/60",
+                      )}
+                    >
+                      {s.balance >= 0 ? "+" : "−"} {brlCompact(Math.abs(s.balance))}
                     </span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                    <span className="flex w-full items-center justify-center gap-2 text-[10px] text-muted-foreground/70">
+                      <span className="inline-flex items-center gap-0.5">
+                        <TrendingUp className="size-2.5 text-income" />
+                        {brlCompact(s.income)}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5">
+                        <TrendingDown className="size-2.5 text-expense" />
+                        {brlCompact(s.expense)}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          {showMore ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-border bg-secondary/40 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              {expanded ? (
+                <>
+                  <ChevronUp className="size-3.5" /> Ver menos
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="size-3.5" /> Ver mais ({data.length})
+                </>
+              )}
+            </button>
+          ) : null}
+        </div>
       </div>
     </section>
   );
