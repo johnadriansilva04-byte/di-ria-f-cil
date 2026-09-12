@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   Download,
+  HelpCircle,
   LayoutDashboard,
   PanelLeftOpen,
   RefreshCw,
@@ -17,16 +18,23 @@ import { WalletSidebar } from "@/components/WalletSidebar";
 import { WalletDashboard } from "@/components/WalletDashboard";
 import { HomeOverview } from "@/components/HomeOverview";
 import { LaunchFeedback, type LaunchFx } from "@/components/LaunchFeedback";
+import { OnboardingTour } from "@/components/OnboardingTour";
+import { CelebrationOverlay, type Celebration } from "@/components/CelebrationOverlay";
+import { gamificationState } from "@/lib/goals";
+import { hasSeenTour, markTourSeen } from "@/lib/tour";
 import {
   isSoundEnabled,
+  playCelebrate,
   playGain,
   playSpend,
+  playSuccess,
   playTick,
   primeAudio,
   setSoundEnabled,
 } from "@/lib/sfx";
 import { useCaixa } from "@/hooks/use-caixa";
-import type { Entry } from "@/lib/caixa";
+import { brl, type Entry } from "@/lib/caixa";
+import { friendlyMonthLabel } from "@/lib/goals";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -225,6 +233,10 @@ function Dashboard({ session }: { session: Session }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [fx, setFx] = useState<LaunchFx | null>(null);
   const [sound, setSound] = useState(true);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [celebration, setCelebration] = useState<Celebration | null>(null);
+  const [grantedStreak, setGrantedStreak] = useState<number | null>(null);
+  const [grantedRecord, setGrantedRecord] = useState<string | null>(null);
 
   const handleGoHome = () => {
     setView("home");
@@ -242,6 +254,15 @@ function Dashboard({ session }: { session: Session }) {
     setSound(isSoundEnabled());
   }, []);
 
+  // Tour de boas-vindas: sobe sozinho na primeira vez que o usuário entra.
+  useEffect(() => {
+    if (!caixa.loading && !hasSeenTour()) {
+      const timer = window.setTimeout(() => setTourOpen(true), 600);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
+  }, [caixa.loading]);
+
   // Som + animação de confirmação: verde no ganho, vermelho no gasto.
   const handleLaunched = (entry: Entry) => {
     if (entry.kind === "entrada") playGain();
@@ -252,6 +273,42 @@ function Dashboard({ session }: { session: Session }) {
       amount: entry.amount,
       listName: caixa.activeList?.name ?? "sua lista",
     });
+
+    // Celebração de dia: primeiro ganho do dia = meta diária batida.
+    // Usa os lançamentos + o recém-criado (o estado ainda não atualizou).
+    const g = gamificationState([...caixa.entries, entry]);
+    if (entry.kind === "entrada") {
+      if (grantedStreak !== g.streak) {
+        setGrantedStreak(g.streak);
+        if (g.streak > 1) {
+          window.setTimeout(() => {
+            primeAudio();
+            playCelebrate();
+            setCelebration({
+              id: Date.now(),
+              kind: "goal",
+              title: `${g.streak} ${g.streak === 1 ? "dia" : "dias"} seguidos registrando seu caixa!`,
+            });
+          }, 950);
+        }
+      }
+
+      if (g.isNewRecordMonth && grantedRecord !== g.bestMonth?.month) {
+        setGrantedRecord(g.bestMonth?.month ?? null);
+        window.setTimeout(() => {
+          primeAudio();
+          playSuccess();
+          setCelebration({
+            id: Date.now(),
+            kind: "record",
+            title: `Este mês você bateu o recorde de receita: ${brl(g.incomeMonth)}!`,
+            ...(g.bestMonth
+              ? { subtitle: `Mais que em ${friendlyMonthLabel(g.bestMonth.month)}.` }
+              : {}),
+          });
+        }, 1250);
+      }
+    }
   };
 
   const toggleSound = () => {
@@ -372,6 +429,15 @@ function Dashboard({ session }: { session: Session }) {
           </span>
           <button
             type="button"
+            onClick={() => setTourOpen(true)}
+            aria-label="Abrir tutorial"
+            title="Como usar (tutorial)"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <HelpCircle className="size-4" />
+          </button>
+          <button
+            type="button"
             onClick={toggleSound}
             aria-pressed={sound}
             aria-label={sound ? "Desligar som" : "Ligar som"}
@@ -448,6 +514,21 @@ function Dashboard({ session }: { session: Session }) {
       </div>
 
       {fx ? <LaunchFeedback key={fx.id} fx={fx} onDone={() => setFx(null)} /> : null}
+      {celebration ? (
+        <CelebrationOverlay
+          key={celebration.id}
+          celebration={celebration}
+          onDone={() => setCelebration(null)}
+        />
+      ) : null}
+      <OnboardingTour
+        open={tourOpen}
+        onClose={() => setTourOpen(false)}
+        onComplete={() => {
+          markTourSeen();
+          setTourOpen(false);
+        }}
+      />
     </div>
   );
 }

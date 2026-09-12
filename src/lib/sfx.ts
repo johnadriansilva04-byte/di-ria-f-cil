@@ -141,3 +141,35 @@ export function playTick(): void {
   if (!ac) return;
   tone(ac, { freq: 1320, dur: 0.09, type: "sine", gain: 0.12 });
 }
+
+/** Fanfarra de vitória: arpejo crescente que sobe e termina com acorde brilhante. */
+export function playSuccess(): void {
+  if (!isSoundEnabled()) return;
+  const ac = audio();
+  if (!ac) return;
+
+  // arpejo C5 – E5 – G5 – C6 (crescente)
+  tone(ac, { freq: 523.25, dur: 0.18, type: "triangle", gain: 0.18 });
+  tone(ac, { freq: 659.25, dur: 0.18, type: "triangle", gain: 0.18, start: 0.11 });
+  tone(ac, { freq: 783.99, dur: 0.18, type: "triangle", gain: 0.18, start: 0.22 });
+  tone(ac, { freq: 1046.5, dur: 0.5, type: "triangle", gain: 0.18, start: 0.33 });
+  // acorde final C major brilhante
+  tone(ac, { freq: 523.25, dur: 0.9, type: "sine", gain: 0.08, start: 0.4 });
+  tone(ac, { freq: 659.25, dur: 0.9, type: "sine", gain: 0.08, start: 0.4 });
+  tone(ac, { freq: 783.99, dur: 0.9, type: "sine", gain: 0.08, start: 0.4 });
+  // faísca no ataque final
+  noise(ac, { start: 0.36, dur: 0.4, gain: 0.05, freq: 8600, q: 0.6 });
+}
+
+/** Comemoração leve para meta batida (sem fanfarra: algo mais sutil). */
+export function playCelebrate(): void {
+  if (!isSoundEnabled()) return;
+  const ac = audio();
+  if (!ac) return;
+
+  // dois "pops" alegres, tipo coração batendo de felicidade
+  tone(ac, { freq: 880, dur: 0.12, type: "sine", gain: 0.16 });
+  tone(ac, { freq: 1174.66, dur: 0.7, type: "sine", gain: 0.14 });
+  tone(ac, { freq: 1760, dur: 0.5, type: "sine", gain: 0.05, start: 0.18 });
+  noise(ac, { start: 0.02, dur: 0.2, gain: 0.045, freq: 7200, q: 0.7 });
+}

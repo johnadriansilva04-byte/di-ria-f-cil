@@ -3,6 +3,7 @@ import { Scale, TrendingDown, TrendingUp } from "lucide-react";
 import { brl, totalsOf, type Entry, type WalletList } from "@/lib/caixa";
 import { cn } from "@/lib/utils";
 import { HomeDonutChart } from "./HomeDonutChart";
+import { GamificationPanel } from "./GamificationPanel";
 
 interface HomeOverviewProps {
   lists: WalletList[];
@@ -134,6 +135,9 @@ export function HomeOverview({
                 </p>
               </div>
             </section>
+
+            {/* Gamificação: metas, recordes e sequência */}
+            {lists.length > 0 ? <GamificationPanel entries={entries} /> : null}
           </div>
         )}
       </div>

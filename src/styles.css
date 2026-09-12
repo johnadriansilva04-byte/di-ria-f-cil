@@ -245,6 +245,64 @@
   animation: caixa-drop 1150ms cubic-bezier(0.4, 0, 0.6, 1) forwards;
 }
 
+/*
+ * Comemoração de metas e recordes (gratificação).
+ * Confete caindo + selo que pula + clarão. Coisa leve: só transform e opacity.
+ */
+@keyframes celebrate-confetti {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(115vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes celebrate-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  45% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes celebrate-glow {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.celebrate-confetti {
+  animation-name: celebrate-confetti;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+  will-change: transform;
+}
+
+.celebrate-pop {
+  animation: celebrate-pop 620ms cubic-bezier(0.2, 0.9, 0.25, 1.1) forwards;
+}
+
+.celebrate-glow {
+  animation: celebrate-glow 900ms ease-out forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .caixa-flash,
   .caixa-pop,
@@ -254,7 +312,10 @@
   .ea-fade,
   .ea-up,
   .ea-pop,
-  .ea-bar {
+  .ea-bar,
+  .celebrate-confetti,
+  .celebrate-pop,
+  .celebrate-glow {
     animation-duration: 1ms;
   }
 }
