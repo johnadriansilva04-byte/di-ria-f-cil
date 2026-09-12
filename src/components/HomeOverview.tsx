@@ -1,25 +1,8 @@
-import { Suspense, lazy, useMemo } from "react";
-import {
-  ArrowRight,
-  LayoutDashboard,
-  ListChecks,
-  Scale,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-} from "lucide-react";
-import {
-  brl,
-  brlCompact,
-  monthlySeries,
-  totalsByList,
-  totalsOf,
-  type Entry,
-  type WalletList,
-} from "@/lib/caixa";
+import { Suspense, useMemo } from "react";
+import { ArrowRight, LayoutDashboard, Scale, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { brl, brlCompact, totalsByList, totalsOf, type Entry, type WalletList } from "@/lib/caixa";
 import { cn } from "@/lib/utils";
-
-const FlowChart = lazy(() => import("./FlowChart").then((m) => ({ default: m.FlowChart })));
+import { HomeDonutChart } from "./HomeDonutChart";
 
 interface HomeOverviewProps {
   lists: WalletList[];
@@ -44,7 +27,6 @@ export function HomeOverview({
   onOpenSidebar,
 }: HomeOverviewProps) {
   const totals = useMemo(() => totalsOf(entries), [entries]);
-  const series = useMemo(() => monthlySeries(entries, 6), [entries]);
   const perList = useMemo(() => totalsByList(entries), [entries]);
 
   const caixaWord = lists.length === 1 ? "caixa" : "caixas";
@@ -76,22 +58,17 @@ export function HomeOverview({
                 }}
               />
               <div className="relative">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                    <span className="size-1.5 rounded-full bg-primary" />
-                    Visão geral
-                  </span>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+                    Saldo geral
+                  </p>
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
                     todos os caixas
                   </span>
                 </div>
-
-                <p className="mt-5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
-                  Saldo geral
-                </p>
                 <p
                   className={cn(
-                    "mt-1 font-[family-name:var(--font-display)] text-4xl font-bold tabular-nums tracking-tight sm:text-6xl",
+                    "mt-2 font-[family-name:var(--font-display)] text-4xl font-bold tabular-nums tracking-tight sm:text-6xl",
                     totals.balance < 0 ? "text-expense" : "text-foreground",
                   )}
                 >
@@ -100,7 +77,7 @@ export function HomeOverview({
                 <p className="mt-2 text-xs text-muted-foreground">
                   {entries.length === 0
                     ? "Nenhum lançamento ainda — comece por um caixa abaixo."
-                    : `${entries.length} ${entries.length === 1 ? "lançamento" : "lançamentos"} · soma de ${lists.length} ${caixaWord}`}
+                    : `${entries.length} ${entries.length === 1 ? "lançamento" : "lançamentos"} em ${lists.length} ${caixaWord}`}
                 </p>
               </div>
             </section>
@@ -201,10 +178,8 @@ export function HomeOverview({
                             {list.name.charAt(0).toUpperCase()}
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="flex items-center justify-between gap-2">
-                              <span className="truncate text-sm font-semibold">{list.name}</span>
-                            </span>
-                            <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground/70">
+                            <span className="truncate text-sm font-semibold">{list.name}</span>
+                            <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground/70">
                               <span className="inline-flex items-center gap-1">
                                 <TrendingUp className="size-3 text-income" />
                                 {brlCompact(summary.income)}
@@ -213,29 +188,21 @@ export function HomeOverview({
                                 <TrendingDown className="size-3 text-expense" />
                                 {brlCompact(summary.expense)}
                               </span>
-                              <span className="inline-flex items-center gap-1">
-                                <ListChecks className="size-3" />
-                                {summary.count} {summary.count === 1 ? "lançamento" : "lançamentos"}
-                              </span>
                             </span>
                           </span>
-                          <span className="flex shrink-0 flex-col items-end gap-1.5">
-                            <span
-                              className={cn(
-                                "font-[family-name:var(--font-display)] text-sm font-bold tabular-nums",
-                                summary.balance < 0
-                                  ? "text-expense"
-                                  : summary.balance > 0
-                                    ? "text-income"
-                                    : "text-muted-foreground/60",
-                              )}
-                            >
-                              {summary.balance >= 0 ? "+" : "−"} {brl(Math.abs(summary.balance))}
-                            </span>
-                            <span className="flex size-6 items-center justify-center rounded-full border border-border text-muted-foreground/50 transition-colors group-hover:border-primary/40 group-hover:text-primary">
-                              <ArrowRight className="size-3.5" />
-                            </span>
+                          <span
+                            className={cn(
+                              "shrink-0 font-[family-name:var(--font-display)] text-sm font-bold tabular-nums",
+                              summary.balance < 0
+                                ? "text-expense"
+                                : summary.balance > 0
+                                  ? "text-income"
+                                  : "text-muted-foreground/60",
+                            )}
+                          >
+                            {summary.balance >= 0 ? "+" : "−"} {brl(Math.abs(summary.balance))}
                           </span>
+                          <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
                         </button>
                       </li>
                     );
@@ -244,13 +211,13 @@ export function HomeOverview({
               )}
             </section>
 
-            {/* Gráfico geral */}
+            {/* Gráfico geral (pizza por caixa) */}
             <Suspense
               fallback={
                 <div className="h-64 animate-pulse rounded-2xl border border-border bg-card" />
               }
             >
-              <FlowChart data={series} listName="todos os caixas" />
+              <HomeDonutChart lists={lists} entries={entries} />
             </Suspense>
           </div>
         )}
