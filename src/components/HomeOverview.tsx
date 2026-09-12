@@ -1,6 +1,6 @@
 import { Suspense, useMemo } from "react";
-import { ArrowRight, LayoutDashboard, Scale, TrendingDown, TrendingUp, Wallet } from "lucide-react";
-import { brl, brlCompact, totalsByList, totalsOf, type Entry, type WalletList } from "@/lib/caixa";
+import { Scale, TrendingDown, TrendingUp } from "lucide-react";
+import { brl, totalsOf, type Entry, type WalletList } from "@/lib/caixa";
 import { cn } from "@/lib/utils";
 import { HomeDonutChart } from "./HomeDonutChart";
 
@@ -27,9 +27,6 @@ export function HomeOverview({
   onOpenSidebar,
 }: HomeOverviewProps) {
   const totals = useMemo(() => totalsOf(entries), [entries]);
-  const perList = useMemo(() => totalsByList(entries), [entries]);
-
-  const caixaWord = lists.length === 1 ? "caixa" : "caixas";
 
   return (
     <div className="h-full overflow-y-auto">
@@ -77,18 +74,23 @@ export function HomeOverview({
                 <p className="mt-2 text-xs text-muted-foreground">
                   {entries.length === 0
                     ? "Nenhum lançamento ainda — comece por um caixa abaixo."
-                    : `${entries.length} ${entries.length === 1 ? "lançamento" : "lançamentos"} em ${lists.length} ${caixaWord}`}
+                    : `${entries.length} ${entries.length === 1 ? "lançamento" : "lançamentos"} em ${lists.length} ${lists.length === 1 ? "caixa" : "caixas"}`}
                 </p>
               </div>
             </section>
 
-            {/* Gráfico geral (pizza por caixa) — em cima, sem precisar rolar */}
+            {/* Gráfico geral (donut) + legenda = cards dos caixas */}
             <Suspense
               fallback={
                 <div className="h-64 animate-pulse rounded-2xl border border-border bg-card" />
               }
             >
-              <HomeDonutChart lists={lists} entries={entries} />
+              <HomeDonutChart
+                lists={lists}
+                entries={entries}
+                onOpenList={onOpenList}
+                onOpenSidebar={onOpenSidebar}
+              />
             </Suspense>
 
             {/* Recebido / Gasto / Resultado */}
@@ -131,93 +133,6 @@ export function HomeOverview({
                   {brl(totals.balance)}
                 </p>
               </div>
-            </section>
-
-            {/* Caixas */}
-            <section>
-              <header className="mb-2.5 flex items-center justify-between gap-2">
-                <h2 className="flex items-center gap-2 font-[family-name:var(--font-display)] text-sm font-bold tracking-tight">
-                  <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <LayoutDashboard className="size-3.5" />
-                  </span>
-                  Seus caixas
-                </h2>
-                {lists.length > 0 ? (
-                  <span className="text-[11px] text-muted-foreground">
-                    {lists.length} {caixaWord} · toque para abrir
-                  </span>
-                ) : null}
-              </header>
-
-              {lists.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border/70 px-5 py-10 text-center">
-                  <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <Wallet className="size-5" />
-                  </span>
-                  <p className="text-sm font-medium text-foreground">Você ainda não tem caixas..</p>
-                  <p className="max-w-xs text-xs text-muted-foreground">
-                    Crie uma lista na barra lateral ao lado para começar a lançar..
-                  </p>
-                  <button
-                    type="button"
-                    onClick={onOpenSidebar}
-                    className="mt-1 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition-transform active:scale-[0.98] lg:hidden"
-                  >
-                    Criar primeiro caixa
-                  </button>
-                </div>
-              ) : (
-                <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                  {lists.map((list) => {
-                    const summary = perList[list.id] ?? {
-                      income: 0,
-                      expense: 0,
-                      balance: 0,
-                      count: 0,
-                    };
-                    return (
-                      <li key={list.id}>
-                        <button
-                          type="button"
-                          onClick={() => onOpenList(list.id)}
-                          aria-label={`Abrir caixa ${list.name}`}
-                          className="group flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
-                        >
-                          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-[family-name:var(--font-display)] text-sm font-bold text-primary">
-                            {list.name.charAt(0).toUpperCase()}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="truncate text-sm font-semibold">{list.name}</span>
-                            <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground/70">
-                              <span className="inline-flex items-center gap-1">
-                                <TrendingUp className="size-3 text-income" />
-                                {brlCompact(summary.income)}
-                              </span>
-                              <span className="inline-flex items-center gap-1">
-                                <TrendingDown className="size-3 text-expense" />
-                                {brlCompact(summary.expense)}
-                              </span>
-                            </span>
-                          </span>
-                          <span
-                            className={cn(
-                              "shrink-0 font-[family-name:var(--font-display)] text-sm font-bold tabular-nums",
-                              summary.balance < 0
-                                ? "text-expense"
-                                : summary.balance > 0
-                                  ? "text-income"
-                                  : "text-muted-foreground/60",
-                            )}
-                          >
-                            {summary.balance >= 0 ? "+" : "−"} {brl(Math.abs(summary.balance))}
-                          </span>
-                          <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
             </section>
           </div>
         )}
