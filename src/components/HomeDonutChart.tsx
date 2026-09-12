@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
+import { TrendingDown, TrendingUp } from "lucide-react";
 import { Cell, Pie, PieChart, Tooltip } from "recharts";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { brl, brlCompact, totalsByList, type Entry, type WalletList } from "@/lib/caixa";
@@ -149,7 +149,7 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
       </div>
 
       {/* Legenda = cards dos caixas */}
-      <ul className="mt-5 grid w-full gap-2 sm:grid-cols-2">
+      <ul className="mt-4 grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
         {data.map((d, index) => {
           const s = byList[d.id] ?? {
             income: 0,
@@ -163,40 +163,41 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
                 type="button"
                 onClick={() => onOpenList?.(d.id)}
                 aria-label={`Abrir caixa ${d.name}`}
-                className="group flex w-full items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
+                className="group flex w-full flex-col items-start gap-1.5 rounded-xl border border-border bg-card px-2.5 py-2.5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
               >
-                <span
-                  className="size-3 shrink-0 rounded-full"
-                  style={{
-                    background: DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0],
-                  }}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{d.name}</span>
-                  <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground/70">
-                    <span className="inline-flex items-center gap-1">
-                      <TrendingUp className="size-3 text-income" />
-                      {brlCompact(s.income)}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <TrendingDown className="size-3 text-expense" />
-                      {brlCompact(s.expense)}
-                    </span>
+                <span className="flex w-full min-w-0 items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{
+                        background: DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0],
+                      }}
+                    />
+                    <span className="block truncate text-xs font-semibold leading-tight">{d.name}</span>
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 font-[family-name:var(--font-display)] text-xs font-bold tabular-nums leading-tight",
+                      s.balance < 0
+                        ? "text-expense"
+                        : s.balance > 0
+                          ? "text-income"
+                          : "text-muted-foreground/60",
+                    )}
+                  >
+                    {s.balance >= 0 ? "+" : "−"} {brlCompact(Math.abs(s.balance))}
                   </span>
                 </span>
-                <span
-                  className={cn(
-                    "shrink-0 font-[family-name:var(--font-display)] text-sm font-bold tabular-nums",
-                    s.balance < 0
-                      ? "text-expense"
-                      : s.balance > 0
-                        ? "text-income"
-                        : "text-muted-foreground/60",
-                  )}
-                >
-                  {s.balance >= 0 ? "+" : "−"} {brl(Math.abs(s.balance))}
+                <span className="flex w-full items-center gap-3 text-[11px] text-muted-foreground/70">
+                  <span className="inline-flex items-center gap-1">
+                    <TrendingUp className="size-3 text-income" />
+                    {brlCompact(s.income)}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <TrendingDown className="size-3 text-expense" />
+                    {brlCompact(s.expense)}
+                  </span>
                 </span>
-                <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-primary" />
               </button>
             </li>
           );
