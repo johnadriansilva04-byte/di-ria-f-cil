@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Download, PanelLeftOpen, X } from "lucide-react";
+import { Download, PanelLeftOpen, RefreshCw, Wallet, X } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthTelefone } from "@/components/AuthTelefone";
@@ -87,31 +87,101 @@ function InstallPrompt() {
   );
 }
 
+// ── Marca / estados iniciais ─────────────────────────────────────────
+
+function BrandMark() {
+  return (
+    <div className="relative">
+      <span aria-hidden className="absolute inset-0 animate-ping rounded-2xl bg-primary/20" />
+      <div className="relative flex size-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+        <Wallet className="size-6" />
+      </div>
+    </div>
+  );
+}
+
+function LoadingScreen({ label }: { label: string }) {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-background px-4">
+      <BrandMark />
+      <div className="text-center">
+        <p className="font-[family-name:var(--font-display)] text-sm font-bold uppercase tracking-[0.25em]">
+          Caixa do Dia
+        </p>
+        <p className="mt-1.5 text-xs text-muted-foreground">{label}</p>
+      </div>
+      <div className="flex items-center gap-1.5">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="size-1.5 animate-bounce rounded-full bg-primary/60"
+            style={{ animationDelay: `${i * 140}ms` }}
+          />
+        ))}
+      </div>
+    </main>
+  );
+}
+
+function SetupError({ message }: { message: string }) {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-background px-4">
+      <BrandMark />
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-center shadow-lg">
+        <p className="font-[family-name:var(--font-display)] text-base font-bold">
+          Não deu para iniciar o caixa
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-transform active:scale-[0.99]"
+        >
+          <RefreshCw className="size-4" /> Tentar de novo
+        </button>
+      </div>
+    </main>
+  );
+}
+
 // ── Porta de entrada (login por telefone) ────────────────────────────
 
 function Index() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
+  const [fatal, setFatal] = useState<string | null>(null);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
+    try {
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+        setSession(s);
+        setChecking(false);
+      });
+      void supabase.auth
+        .getSession()
+        .then(({ data }) => {
+          setSession(data.session);
+          setChecking(false);
+        })
+        .catch(() => {
+          setChecking(false);
+          setFatal(
+            "Não conseguimos falar com o servidor de dados. Confira sua internet e tente novamente.",
+          );
+        });
+      return () => sub.subscription.unsubscribe();
+    } catch {
+      // Falta a configuração do Supabase neste ambiente (URL/chave pública).
       setChecking(false);
-    });
-    void supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setChecking(false);
-    });
-    return () => sub.subscription.unsubscribe();
+      setFatal(
+        "A conexão com o banco não está configurada aqui (VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY).",
+      );
+      return undefined;
+    }
   }, []);
 
-  if (checking) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-sm text-muted-foreground">Carregando…</p>
-      </main>
-    );
-  }
+  if (checking) return <LoadingScreen label="Carregando seu caixa…" />;
+  if (fatal) return <SetupError message={fatal} />;
 
   if (!session) return <AuthTelefone />;
 
