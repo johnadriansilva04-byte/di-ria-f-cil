@@ -23,10 +23,10 @@ const DONUT_PALETTE = [
   "var(--expense)",
 ];
 
-const config = { recebido: { label: "Recebido" } } satisfies ChartConfig;
+const config = { resultado: { label: "Resultado" } } satisfies ChartConfig;
 
 /**
- * Gráfico geral (donut) da Home: o recebido de cada caixa como fatia.
+ * Gráfico geral (donut) da Home: o RESULTADO de cada caixa como fatia.
 
  * O donut fica em cima e os CARDS dos caixas sao a propria legenda,
  * cada um com a bolinha da cor da sua fatia. Clicar em um card abre o caixa.
@@ -39,12 +39,13 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
       lists.map((l) => ({
         id: l.id,
         name: l.name,
-        value: Math.round(byList[l.id]?.income ?? 0),
+        value: Math.abs(Math.round(byList[l.id]?.balance ?? 0)),
       })),
     [lists, byList],
   );
 
-  const total = data.reduce((sum, d) => sum + d.value, 0);
+  const totalAbs = data.reduce((sum, d) => sum + d.value, 0);
+  const totalBalance = lists.reduce((sum, l) => sum + (byList[l.id]?.balance ?? 0), 0);
 
   if (lists.length === 0) {
     return (
@@ -53,7 +54,7 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
           <h2 className="font-[family-name:var(--font-display)] text-sm font-bold tracking-tight">
             Gráfico geral
           </h2>
-          <span className="text-[11px] text-muted-foreground">recebido por caixa</span>
+          <span className="text-[11px] text-muted-foreground">resultado por caixa</span>
         </header>
         <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 px-5 py-10 text-center">
           <p className="text-sm font-medium text-foreground">Você ainda não tem caixas.</p>
@@ -82,18 +83,18 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
             Gráfico geral
           </h2>
           <span className="rounded-full border border-border bg-secondary/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            recebido por caixa
+            resultado por caixa
           </span>
         </div>
         <span className="text-[11px] tabular-nums text-muted-foreground">
-          total {brlCompact(total)}
+          total {brlCompact(totalAbs)}
         </span>
       </header>
 
       {/* Donut em cima */}
       <div className="flex justify-center">
         <div className="relative size-48 sm:size-56">
-          {total > 0 ? (
+          {totalAbs > 0 ? (
             <ChartContainer config={config} className="aspect-auto size-full">
               <PieChart>
                 <Tooltip
@@ -129,10 +130,19 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
           )}
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-              Recebido
+              Resultado geral
             </span>
-            <span className="mt-0.5 font-[family-name:var(--font-display)] text-lg font-bold tabular-nums sm:text-xl">
-              {brlCompact(total)}
+            <span
+              className={cn(
+                "mt-0.5 font-[family-name:var(--font-display)] text-lg font-bold tabular-nums sm:text-xl",
+                totalBalance < 0
+                  ? "text-expense"
+                  : totalBalance > 0
+                    ? "text-income"
+                    : "text-muted-foreground/60",
+              )}
+            >
+              {totalBalance >= 0 ? "+" : "−"} {brl(Math.abs(totalBalance))}
             </span>
           </div>
         </div>
