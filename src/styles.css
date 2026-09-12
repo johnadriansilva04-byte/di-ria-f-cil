@@ -249,7 +249,78 @@
   .caixa-pop,
   .caixa-ring,
   .caixa-rise,
-  .caixa-drop {
+  .caixa-drop,
+  .ea-fade,
+  .ea-up,
+  .ea-pop,
+  .ea-glow {
     animation-duration: 1ms;
   }
+}
+
+/*
+ * Abertura do app / entrada (EASY ACCOUNT)
+ * Entrada curta e progressiva: nada bloqueia o uso da interface.
+ */
+@keyframes ea-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ea-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ea-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ea-glow {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.06);
+  }
+}
+
+.ea-fade {
+  animation: ea-fade 420ms ease-out both;
+}
+
+.ea-up {
+  animation: ea-up 520ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.ea-pop {
+  animation: ea-pop 620ms cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+}
+
+.ea-glow {
+  animation: ea-glow 7s ease-in-out infinite;
 }

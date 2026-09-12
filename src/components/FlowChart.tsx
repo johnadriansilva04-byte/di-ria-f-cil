@@ -8,6 +8,52 @@ const config = {
   expense: { label: "Gasto", color: "var(--expense)" },
 } satisfies ChartConfig;
 
+const chartConfig = config;
+
+interface FlowBarsProps {
+  data: MonthPoint[];
+  compact?: boolean;
+}
+
+/** Só as barras do fluxo — reaproveitadas no dashboard e na entrada do app. */
+export function FlowBars({ data, compact = false }: FlowBarsProps) {
+  return (
+    <ChartContainer
+      config={chartConfig}
+      className={compact ? "h-32 w-full aspect-auto sm:h-40" : "h-52 w-full aspect-auto sm:h-64"}
+    >
+      <BarChart data={data} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+        <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+        <YAxis
+          tickLine={false}
+          axisLine={false}
+          fontSize={11}
+          width={58}
+          tickFormatter={(value: number) => brlCompact(value)}
+        />
+        <Tooltip
+          cursor={{ fill: "var(--muted)", opacity: 0.3 }}
+          contentStyle={{
+            background: "var(--card)",
+            border: "1px solid var(--border)",
+            borderRadius: 12,
+            fontSize: 12,
+            color: "var(--foreground)",
+          }}
+          labelStyle={{ color: "var(--muted-foreground)", marginBottom: 4 }}
+          formatter={(value, name) => [
+            brl(Number(value)),
+            name === "income" ? "Recebido" : "Gasto",
+          ]}
+        />
+        <Bar dataKey="income" fill="var(--income)" radius={[5, 5, 0, 0]} maxBarSize={38} />
+        <Bar dataKey="expense" fill="var(--expense)" radius={[5, 5, 0, 0]} maxBarSize={38} />
+      </BarChart>
+    </ChartContainer>
+  );
+}
+
 interface FlowChartProps {
   data: MonthPoint[];
   listName: string;
@@ -36,39 +82,9 @@ export function FlowChart({ data, listName }: FlowChartProps) {
             <span className="size-2 rounded-sm bg-expense" /> Gasto
           </span>
         </div>
-      </header>
-
+      </header>{" "}
       {hasData ? (
-        <ChartContainer config={config} className="h-52 w-full aspect-auto sm:h-64">
-          <BarChart data={data} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              fontSize={11}
-              width={58}
-              tickFormatter={(value: number) => brlCompact(value)}
-            />
-            <Tooltip
-              cursor={{ fill: "var(--muted)", opacity: 0.3 }}
-              contentStyle={{
-                background: "var(--card)",
-                border: "1px solid var(--border)",
-                borderRadius: 12,
-                fontSize: 12,
-                color: "var(--foreground)",
-              }}
-              labelStyle={{ color: "var(--muted-foreground)", marginBottom: 4 }}
-              formatter={(value, name) => [
-                brl(Number(value)),
-                name === "income" ? "Recebido" : "Gasto",
-              ]}
-            />
-            <Bar dataKey="income" fill="var(--income)" radius={[5, 5, 0, 0]} maxBarSize={38} />
-            <Bar dataKey="expense" fill="var(--expense)" radius={[5, 5, 0, 0]} maxBarSize={38} />
-          </BarChart>
-        </ChartContainer>
+        <FlowBars data={data} />
       ) : (
         <div className="flex h-40 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border/70 text-center">
           <p className="text-sm text-muted-foreground">Sem movimentação nos últimos 6 meses</p>

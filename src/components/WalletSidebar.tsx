@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, LogOut, Menu, Pencil, Plus, Trash2, Wallet, X } from "lucide-react";
+import { Check, LogOut, Menu, Pencil, Plus, Trash2, X } from "lucide-react";
 import { brl, brlCompact, type Totals, type WalletList } from "@/lib/caixa";
+import { BrandLockup } from "@/components/Brand";
 import { cn } from "@/lib/utils";
 
 interface WalletSidebarProps {
@@ -141,19 +142,12 @@ export function WalletSidebar({
     <div className="flex h-full w-72 flex-col border-r border-border bg-sidebar lg:w-64">
       {/* Cabeçalho */}
       <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary/15 text-sidebar-primary">
-            <Wallet className="size-4" />
-          </div>
-          <div className="leading-none">
-            <span className="block font-[family-name:var(--font-display)] text-sm font-bold tracking-tight text-sidebar-foreground">
-              CAIXA
-            </span>
-            <span className="mt-0.5 block text-[10px] text-muted-foreground/60">
-              lançamento manual
-            </span>
-          </div>
-        </div>
+        <BrandLockup
+          size="sm"
+          markClassName="size-8 rounded-xl"
+          subtitle="controle manual"
+          className="text-sidebar-foreground"
+        />
         <button
           type="button"
           onClick={onToggleCollapse}

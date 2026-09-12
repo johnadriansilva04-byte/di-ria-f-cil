@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Download, PanelLeftOpen, RefreshCw, Volume2, VolumeX, Wallet, X } from "lucide-react";
+import { Download, PanelLeftOpen, RefreshCw, Volume2, VolumeX, X } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { AuthTelefone } from "@/components/AuthTelefone";
+import { BrandMark } from "@/components/Brand";
+import { EntryScreen } from "@/components/EntryScreen";
 import { WalletSidebar } from "@/components/WalletSidebar";
 import { WalletDashboard } from "@/components/WalletDashboard";
 import { LaunchFeedback, type LaunchFx } from "@/components/LaunchFeedback";
@@ -21,13 +22,13 @@ import type { Entry } from "@/lib/caixa";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Caixa do Dia | Controle de entradas e gastos" },
+      { title: "Easy Account | Controle de caixa manual" },
       {
         name: "description",
         content:
-          "Caixa manual: lance recebimentos e gastos em listas independentes. Cada lista tem o próprio saldo, extrato e gráfico.",
+          "Registre entradas e gastos, acompanhe o saldo e entenda o caixa de cada lista. Simples, rápido e no seu controle.",
       },
-      { property: "og:title", content: "Caixa do Dia" },
+      { property: "og:title", content: "Easy Account" },
       {
         property: "og:description",
         content: "Lançamento manual, listas independentes e saldo na hora.",
@@ -99,13 +100,11 @@ function InstallPrompt() {
 
 // ── Marca / estados iniciais ─────────────────────────────────────────
 
-function BrandMark() {
+function PulsingMark() {
   return (
     <div className="relative">
       <span aria-hidden className="absolute inset-0 animate-ping rounded-2xl bg-primary/20" />
-      <div className="relative flex size-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-        <Wallet className="size-6" />
-      </div>
+      <BrandMark className="relative size-12" />
     </div>
   );
 }
@@ -113,10 +112,10 @@ function BrandMark() {
 function LoadingScreen({ label }: { label: string }) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-background px-4">
-      <BrandMark />
+      <PulsingMark />
       <div className="text-center">
         <p className="font-[family-name:var(--font-display)] text-sm font-bold uppercase tracking-[0.25em]">
-          Caixa do Dia
+          Easy Account
         </p>
         <p className="mt-1.5 text-xs text-muted-foreground">{label}</p>
       </div>
@@ -136,7 +135,7 @@ function LoadingScreen({ label }: { label: string }) {
 function SetupError({ message }: { message: string }) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-background px-4">
-      <BrandMark />
+      <PulsingMark />
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-center shadow-lg">
         <p className="font-[family-name:var(--font-display)] text-base font-bold">
           Não deu para iniciar o caixa
@@ -193,7 +192,7 @@ function Index() {
   if (checking) return <LoadingScreen label="Carregando seu caixa…" />;
   if (fatal) return <SetupError message={fatal} />;
 
-  if (!session) return <AuthTelefone />;
+  if (!session) return <EntryScreen />;
 
   return (
     <>

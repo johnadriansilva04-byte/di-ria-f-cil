@@ -1,7 +1,7 @@
 {
-  "name": "Caixa do Dia - Controle de Diária",
-  "short_name": "Caixa do Dia",
-  "description": "Registro simples de entradas, diárias, horas extras e gastos.",
+  "name": "Easy Account - Controle de caixa",
+  "short_name": "Easy Account",
+  "description": "Registre entradas e gastos e acompanhe o saldo, o extrato e o gráfico de cada lista.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

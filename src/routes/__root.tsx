@@ -86,15 +86,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Caixa do Dia | Controle de entradas e gastos" },
+      { title: "Easy Account | Controle de caixa manual" },
       {
         name: "description",
         content:
-          "Lance manualmente o que entrou e o que saiu. Cada lista com saldo, extrato e gráfico próprios.",
+          "Registre o que entrou e o que saiu, com saldo, extrato e gráfico por lista. Simples, rápido e no seu controle.",
       },
       { name: "theme-color", content: "#12131a" },
-      { property: "og:title", content: "Caixa do Dia" },
-      { property: "og:description", content: "Controle simples de entrada e saída de dinheiro." },
+      { property: "og:title", content: "Easy Account" },
+      { property: "og:description", content: "Seu dinheiro. Seu controle." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
