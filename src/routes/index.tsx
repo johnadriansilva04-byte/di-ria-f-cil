@@ -1,75 +1,51 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useCallback } from "react";
-import { Download, X, PanelLeftOpen, PanelLeftClose } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Download, PanelLeftOpen, X } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthTelefone } from "@/components/AuthTelefone";
 import { WalletSidebar } from "@/components/WalletSidebar";
 import { WalletDashboard } from "@/components/WalletDashboard";
-import {
-  fetchWalletLists,
-  getActiveListId,
-  setActiveListId,
-  fetchPerfil,
-  toNumber,
-  savePerfil,
-  maskPhone,
-  createWalletList,
-  type WalletList,
-} from "@/lib/caixa";
+import { useCaixa } from "@/hooks/use-caixa";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Caixa do Dia | Controle financeiro" },
+      { title: "Caixa do Dia | Controle de entradas e gastos" },
       {
         name: "description",
         content:
-          "Dashboard financeiro modular. Controle seus gastos e recebimentos em listas independentes.",
+          "Caixa manual: lance recebimentos e gastos em listas independentes. Cada lista tem o próprio saldo, extrato e gráfico.",
       },
       { property: "og:title", content: "Caixa do Dia" },
       {
         property: "og:description",
-        content: "Controle financeiro modular e profissional.",
+        content: "Lançamento manual, listas independentes e saldo na hora.",
       },
     ],
   }),
   component: Index,
 });
 
-// ── PWA Install Prompt ───────────────────────────────────────────────
+// ── Aviso de instalação (PWA) ────────────────────────────────────────
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+}
 
 function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
       setShowPrompt(true);
     };
-
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
-    };
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
   }, []);
-
-  const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      console.log("PWA instalado com sucesso");
-    }
-    setDeferredPrompt(null);
-    setShowPrompt(false);
-  };
-
-  const handleDismiss = () => {
-    setShowPrompt(false);
-  };
 
   if (!showPrompt || !deferredPrompt) return null;
 
@@ -83,20 +59,25 @@ function InstallPrompt() {
             </div>
             <div>
               <p className="text-sm font-semibold">Instalar App</p>
-              <p className="text-xs text-muted-foreground">
-                Acesso rápido na tela inicial
-              </p>
+              <p className="text-xs text-muted-foreground">Acesso rápido na tela inicial</p>
             </div>
           </div>
           <button
-            onClick={handleDismiss}
+            type="button"
+            onClick={() => setShowPrompt(false)}
+            aria-label="Fechar aviso"
             className="rounded-md p-1 text-muted-foreground hover:bg-secondary"
           >
             <X className="size-4" />
           </button>
         </div>
         <button
-          onClick={handleInstall}
+          type="button"
+          onClick={() => {
+            void deferredPrompt.prompt();
+            setDeferredPrompt(null);
+            setShowPrompt(false);
+          }}
           className="mt-3 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
         >
           Instalar agora
@@ -106,7 +87,7 @@ function InstallPrompt() {
   );
 }
 
-// ── Auth gate ────────────────────────────────────────────────────────
+// ── Porta de entrada (login por telefone) ────────────────────────────
 
 function Index() {
   const [session, setSession] = useState<Session | null>(null);
@@ -142,177 +123,152 @@ function Index() {
   );
 }
 
-// ── Main dashboard ───────────────────────────────────────────────────
+// ── Aplicativo ───────────────────────────────────────────────────────
 
 function Dashboard({ session }: { session: Session }) {
   const userId = session.user.id;
   const telefone = (session.user.user_metadata?.["telefone"] as string | undefined) ?? "";
+  const caixa = useCaixa(userId);
 
-  const [lists, setLists] = useState<WalletList[]>([]);
-  const [activeListId, setActiveListIdState] = useState<string | null>(null);
-  const [perfil, setPerfil] = useState<{ diaria: number; valorHora: number } | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  // Load wallet lists
-  const loadLists = useCallback(() => {
-    const loaded = fetchWalletLists();
-    setLists(loaded);
+  const error = actionError ?? caixa.error;
+  const daily = caixa.perfil ? String(caixa.perfil.diaria) : "130";
+  const hourRate = caixa.perfil ? String(caixa.perfil.valorHora) : "";
 
-    // If no lists exist, create a default one
-    if (loaded.length === 0) {
-      const defaultList = createWalletList("Meu Trabalho");
-      setLists([defaultList]);
-      setActiveListId(defaultList.id);
-      setActiveListIdState(defaultList.id);
-      return;
-    }
-
-    // Restore active list or select first
-    const savedActive = getActiveListId();
-    if (savedActive && loaded.some((l) => l.id === savedActive)) {
-      setActiveListIdState(savedActive);
-    } else {
-      const first = loaded[0];
-      if (first) {
-        setActiveListIdState(first.id);
-        setActiveListId(first.id);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    loadLists();
-  }, [loadLists]);
-
-  // Load perfil
-  useEffect(() => {
-    void (async () => {
-      try {
-        const p = await fetchPerfil(userId);
-        if (p) setPerfil(p);
-      } catch (e) {
-        console.error("Erro ao carregar perfil:", e);
-      }
-    })();
-  }, [userId]);
-
-  // Save perfil when daily/hourRate changes (debounced handled in previous version)
-  const handlePerfilSave = useCallback(
-    (diaria: number, valorHora: number) => {
-      setPerfil({ diaria, valorHora });
-      void savePerfil(userId, diaria, valorHora).catch(() => undefined);
-    },
-    [userId]
-  );
-
-  // Handle list selection
   const handleSelectList = (id: string) => {
-    setActiveListIdState(id);
-    setActiveListId(id);
+    caixa.selectList(id);
     setMobileSidebarOpen(false);
+    setActionError(null);
   };
-
-  // Handle sign out
-  const handleSignOut = () => {
-    void supabase.auth.signOut();
-  };
-
-  const activeList = lists.find((l) => l.id === activeListId);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Desktop sidebar */}
+      {/* Barra lateral — desktop */}
       <div className="hidden lg:flex">
         <WalletSidebar
-          lists={lists}
-          activeListId={activeListId}
+          lists={caixa.lists}
+          activeListId={caixa.activeListId}
+          summaries={caixa.summaries}
           onSelectList={handleSelectList}
-          onUpdate={loadLists}
+          onCreate={async (name) => {
+            await caixa.addList(name);
+          }}
+          onRename={caixa.editList}
+          onDelete={caixa.removeList}
           telefone={telefone}
-          onSignOut={handleSignOut}
+          onSignOut={() => void supabase.auth.signOut()}
           collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed((p) => !p)}
+          onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
         />
       </div>
 
-      {/* Mobile sidebar overlay */}
-      {mobileSidebarOpen && (
+      {/* Barra lateral — celular */}
+      {mobileSidebarOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileSidebarOpen(false)}
           />
-          <div className="relative z-50 h-full">
+          <div className="relative z-50 h-full w-72 max-w-[85vw]">
             <WalletSidebar
-              lists={lists}
-              activeListId={activeListId}
+              lists={caixa.lists}
+              activeListId={caixa.activeListId}
+              summaries={caixa.summaries}
               onSelectList={handleSelectList}
-              onUpdate={loadLists}
+              onCreate={async (name) => {
+                await caixa.addList(name);
+              }}
+              onRename={caixa.editList}
+              onDelete={caixa.removeList}
               telefone={telefone}
-              onSignOut={handleSignOut}
+              onSignOut={() => void supabase.auth.signOut()}
               collapsed={false}
               onToggleCollapse={() => setMobileSidebarOpen(false)}
             />
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Main content area */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Mobile header */}
-        <div className="flex items-center gap-3 border-b border-border bg-background px-4 py-3 lg:hidden">
+        {/* Barra superior */}
+        <div className="flex items-center gap-3 border-b border-border bg-background px-4 py-3">
+          {sidebarCollapsed ? (
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(false)}
+              aria-label="Mostrar listas"
+              className="hidden size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:flex"
+            >
+              <PanelLeftOpen className="size-5" />
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setMobileSidebarOpen(true)}
-            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            aria-label="Abrir listas"
+            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:hidden"
           >
             <PanelLeftOpen className="size-5" />
           </button>
-          {activeList && (
-            <span className="font-[family-name:var(--font-display)] text-sm font-semibold">
-              {activeList.name}
-            </span>
-          )}
+          <span className="truncate font-[family-name:var(--font-display)] text-sm font-semibold">
+            {caixa.activeList ? caixa.activeList.name : "Caixa"}
+          </span>
         </div>
 
-        {/* Desktop collapse toggle */}
-        {sidebarCollapsed && (
-          <button
-            type="button"
-            onClick={() => setSidebarCollapsed(false)}
-            className="absolute left-2 top-3 z-30 hidden size-8 items-center justify-center rounded-lg bg-card text-muted-foreground shadow-sm transition-colors hover:bg-secondary hover:text-foreground lg:flex"
-          >
-            <PanelLeftClose className="size-4" />
-          </button>
-        )}
-
-        {/* Error message */}
-        {erro && (
-          <div className="border-b border-destructive/20 bg-destructive/5 px-6 py-2">
-            <p className="text-sm font-medium text-destructive">{erro}</p>
+        {/* Erros */}
+        {error ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-destructive/20 bg-destructive/5 px-4 py-2 sm:px-6">
+            <p className="text-sm font-medium text-destructive">{error}</p>
+            {caixa.migrationNeeded ? (
+              <code className="rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] text-destructive">
+                supabase/setup_completo.sql
+              </code>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setActionError(null);
+                  caixa.refresh();
+                }}
+                className="text-xs font-semibold text-destructive underline underline-offset-2"
+              >
+                Tentar novamente
+              </button>
+            )}
           </div>
-        )}
+        ) : null}
 
-        {/* Wallet content */}
-        <div className="flex-1 overflow-hidden">
-          {activeList ? (
+        {/* Conteúdo */}
+        <div className="min-h-0 flex-1">
+          {caixa.activeList ? (
             <WalletDashboard
-              key={activeList.id}
-              list={activeList}
-              userId={userId}
-              perfil={perfil}
-              onError={setErro}
-              isFirstList={activeList.id === lists[0]?.id}
+              key={caixa.activeList.id}
+              list={caixa.activeList}
+              lists={caixa.lists}
+              entries={caixa.activeEntries}
+              loading={caixa.loading}
+              daily={daily}
+              hourRate={hourRate}
+              onRename={(name) => void caixa.editList(caixa.activeList!.id, name)}
+              onCreate={async (input) => {
+                setActionError(null);
+                return caixa.addEntry(input);
+              }}
+              onEditEntry={caixa.editEntry}
+              onDeleteEntry={caixa.removeEntry}
+              onSavePerfil={(diaria, valorHora) => void caixa.updatePerfil(diaria, valorHora)}
+              onError={setActionError}
             />
           ) : (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">
-                  Selecione uma lista na barra lateral.
-                </p>
-              </div>
+            <div className="flex h-full items-center justify-center px-4">
+              <p className="text-center text-sm text-muted-foreground">
+                {caixa.loading
+                  ? "Carregando suas listas…"
+                  : "Crie uma lista na barra lateral para começar a lançar."}
+              </p>
             </div>
           )}
         </div>

@@ -1,126 +1,100 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Check, FileText, Lock, Pencil, X } from "lucide-react";
 import {
-  Pencil,
-  Check,
-  X,
-  FileText,
-  ArrowUpCircle,
-  ArrowDownCircle,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  BarChart3,
-} from "lucide-react";
-import type { WalletList, Entry } from "@/lib/caixa";
-import {
-  brl,
-  fetchEntries,
-  renameWalletList,
+  filterByPeriod,
+  monthlySeries,
+  totalsOf,
+  type Entry,
+  type EntryPatch,
+  type Period,
+  type WalletList,
 } from "@/lib/caixa";
-import { TransactionForm } from "./TransactionForm";
+import type { NewEntry } from "@/hooks/use-caixa";
+import { EntryRow } from "./EntryRow";
+import { FlowChart } from "./FlowChart";
 import { StatementView } from "./StatementView";
+import { TransactionForm } from "./TransactionForm";
+import { WalletSummary } from "./WalletSummary";
 
 interface WalletDashboardProps {
   list: WalletList;
-  userId: string;
-  perfil: { diaria: number; valorHora: number } | null;
-  onError: (msg: string) => void;
-  isFirstList?: boolean;
+  lists: WalletList[];
+  entries: Entry[];
+  loading: boolean;
+  daily: string;
+  hourRate: string;
+  onRename: (name: string) => void;
+  onCreate: (input: NewEntry) => Promise<Entry>;
+  onEditEntry: (id: string, patch: EntryPatch) => Promise<void>;
+  onDeleteEntry: (id: string) => Promise<void>;
+  onSavePerfil: (diaria: number, valorHora: number) => void;
+  onError: (msg: string | null) => void;
 }
+
+const RECENT_LIMIT = 6;
 
 export function WalletDashboard({
   list,
-  userId,
-  perfil,
+  lists,
+  entries,
+  loading,
+  daily,
+  hourRate,
+  onRename,
+  onCreate,
+  onEditEntry,
+  onDeleteEntry,
+  onSavePerfil,
   onError,
-  isFirstList,
 }: WalletDashboardProps) {
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  // "Tudo" é o saldo real do caixa; os outros períodos são lentes de análise.
+  const [period, setPeriod] = useState<Period>("tudo");
   const [showStatement, setShowStatement] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(list.name);
 
-  // Sync nameValue when list changes
   useEffect(() => {
     setNameValue(list.name);
     setEditingName(false);
+    setShowStatement(false);
   }, [list.id, list.name]);
 
-  // Load entries for this list
-  const loadEntries = useCallback(async () => {
-    setLoaded(false);
-    try {
-      const data = await fetchEntries(list.id, isFirstList);
-      setEntries(data);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro desconhecido";
-      console.error("Erro ao carregar dados:", msg);
-      onError("Erro ao carregar dados. Tente novamente.");
-    } finally {
-      setLoaded(true);
-    }
-  }, [list.id, onError]);
+  const periodEntries = useMemo(() => filterByPeriod(entries, period), [entries, period]);
+  const totals = useMemo(() => totalsOf(periodEntries), [periodEntries]);
+  const series = useMemo(() => monthlySeries(entries, 6), [entries]);
+  const recent = periodEntries.slice(0, RECENT_LIMIT);
 
-  useEffect(() => {
-    void loadEntries();
-  }, [loadEntries]);
-
-  // Compute totals
-  const totals = useMemo(() => {
-    const inc = entries
-      .filter((e) => e.kind === "entrada")
-      .reduce((s, e) => s + e.amount, 0);
-    const out = entries
-      .filter((e) => e.kind === "saida")
-      .reduce((s, e) => s + e.amount, 0);
-    return { inc, out, saldo: inc - out };
-  }, [entries]);
-
-  // Handle new transaction
-  const handleTransactionSuccess = (entry: Entry) => {
-    setEntries((prev) => [entry, ...prev]);
-  };
-
-  // Handle delete
-  const handleDeleteEntry = (id: string) => {
-    setEntries((prev) => prev.filter((x) => x.id !== id));
-  };
-
-  // Handle rename
-  const handleRename = () => {
-    if (!nameValue.trim() || nameValue.trim() === list.name) {
+  const commitRename = () => {
+    const next = nameValue.trim();
+    if (!next || next === list.name) {
       setNameValue(list.name);
       setEditingName(false);
       return;
     }
-    renameWalletList(list.id, nameValue);
+    onRename(next);
     setEditingName(false);
   };
 
-  // Daily / hourRate for the form
-  const daily = perfil ? String(perfil.diaria) : "130";
-  const hourRate = perfil ? String(perfil.valorHora) : "";
-
-  // Statement view
   if (showStatement) {
     return (
       <StatementView
         entries={entries}
-        loaded={loaded}
-        onDelete={handleDeleteEntry}
-        onDeleteError={onError}
-        onBack={() => setShowStatement(false)}
+        lists={lists}
+        loading={loading}
         walletName={list.name}
+        onSave={onEditEntry}
+        onDelete={onDeleteEntry}
+        onError={onError}
+        onBack={() => setShowStatement(false)}
       />
     );
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
-      <div className="mx-auto w-full max-w-2xl px-6 py-6">
-        {/* Wallet header */}
-        <div className="mb-6 flex items-center gap-3">
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
+        {/* Cabeçalho da lista ativa */}
+        <header className="mb-4 flex flex-wrap items-center gap-2">
           {editingName ? (
             <div className="flex items-center gap-2">
               <input
@@ -128,17 +102,18 @@ export function WalletDashboard({
                 value={nameValue}
                 onChange={(e) => setNameValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleRename();
+                  if (e.key === "Enter") commitRename();
                   if (e.key === "Escape") {
                     setNameValue(list.name);
                     setEditingName(false);
                   }
                 }}
-                className="rounded-lg border border-input bg-background px-3 py-1.5 text-lg font-bold outline-none focus:border-ring focus:ring-1 focus:ring-ring/30"
+                className="rounded-lg border border-input bg-background px-3 py-1.5 font-[family-name:var(--font-display)] text-lg font-bold outline-none focus:border-ring focus:ring-1 focus:ring-ring/30"
               />
               <button
                 type="button"
-                onClick={handleRename}
+                onClick={commitRename}
+                aria-label="Confirmar novo nome"
                 className="rounded-md p-1.5 text-income transition-colors hover:bg-secondary"
               >
                 <Check className="size-4" />
@@ -149,6 +124,7 @@ export function WalletDashboard({
                   setNameValue(list.name);
                   setEditingName(false);
                 }}
+                aria-label="Cancelar renomear"
                 className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary"
               >
                 <X className="size-4" />
@@ -156,103 +132,101 @@ export function WalletDashboard({
             </div>
           ) : (
             <>
-              <h1 className="font-[family-name:var(--font-display)] text-xl font-bold tracking-tight">
+              <h1 className="font-[family-name:var(--font-display)] text-xl font-bold tracking-tight sm:text-2xl">
                 {list.name}
               </h1>
               <button
                 type="button"
                 onClick={() => setEditingName(true)}
+                title="Renomear lista"
+                aria-label="Renomear lista"
                 className="rounded-md p-2 text-muted-foreground/60 transition-colors hover:bg-secondary hover:text-foreground"
-                title="Renomear caixa"
-                aria-label="Renomear caixa"
               >
                 <Pencil className="size-4" />
               </button>
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                <Lock className="size-3" />
+                lançamentos só desta lista
+              </span>
             </>
           )}
-        </div>
+        </header>
 
-        {/* Summary cards */}
-        <div className="mb-4 grid grid-cols-3 gap-3">
-          {/* Saldo */}
-          <div className="col-span-3 rounded-xl border border-border bg-card p-5">
-            <div className="flex items-center gap-2">
-              <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
-                <Wallet className="size-3.5 text-primary" />
-              </div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                Saldo
-              </p>
+        {loading ? (
+          <div className="grid gap-3">
+            <div className="h-36 animate-pulse rounded-2xl border border-border bg-card" />
+            <div className="grid grid-cols-3 gap-3">
+              <div className="h-20 animate-pulse rounded-xl border border-border bg-card" />
+              <div className="h-20 animate-pulse rounded-xl border border-border bg-card" />
+              <div className="h-20 animate-pulse rounded-xl border border-border bg-card" />
             </div>
-            <p
-              className={`mt-2 font-[family-name:var(--font-display)] text-3xl font-bold tabular-nums ${
-                totals.saldo < 0 ? "text-expense" : "text-foreground"
-              }`}
-            >
-              {brl(totals.saldo)}
-            </p>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6">
+            <div className="flex flex-col gap-4">
+              <WalletSummary
+                listName={list.name}
+                totals={totals}
+                period={period}
+                onPeriodChange={setPeriod}
+              />
+              <FlowChart data={series} listName={list.name} />
+            </div>
 
-        {/* Secondary indicators */}
-        <div className="mb-6 grid grid-cols-3 gap-3">
-          <div className="rounded-xl border border-border bg-card px-4 py-3">
-            <div className="flex items-center gap-1.5">
-              <TrendingUp className="size-3.5 text-income" />
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                Recebido
-              </p>
-            </div>
-            <p className="mt-1.5 font-[family-name:var(--font-display)] text-base font-bold tabular-nums text-income">
-              {brl(totals.inc)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border bg-card px-4 py-3">
-            <div className="flex items-center gap-1.5">
-              <TrendingDown className="size-3.5 text-expense" />
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                Gastos
-              </p>
-            </div>
-            <p className="mt-1.5 font-[family-name:var(--font-display)] text-base font-bold tabular-nums text-expense">
-              {brl(totals.out)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border bg-card px-4 py-3">
-            <div className="flex items-center gap-1.5">
-              <BarChart3 className="size-3.5 text-primary" />
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                Resultado
-              </p>
-            </div>
-            <p
-              className={`mt-1.5 font-[family-name:var(--font-display)] text-base font-bold tabular-nums ${
-                totals.saldo < 0 ? "text-expense" : "text-foreground"
-              }`}
-            >
-              {brl(totals.saldo)}
-            </p>
-          </div>
-        </div>
+            <div className="flex flex-col gap-4 lg:sticky lg:top-4">
+              <TransactionForm
+                listName={list.name}
+                daily={daily}
+                hourRate={hourRate}
+                onCreate={onCreate}
+                onSavePerfil={onSavePerfil}
+                onError={onError}
+              />
 
-        {/* Transaction form */}
-        <TransactionForm
-          userId={userId}
-          daily={daily}
-          hourRate={hourRate}
-          onSuccess={handleTransactionSuccess}
-          onError={onError}
-        />
+              <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                <header className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
+                  <h2 className="font-[family-name:var(--font-display)] text-sm font-bold tracking-tight">
+                    Últimos lançamentos
+                  </h2>
+                  <span className="text-[11px] text-muted-foreground">
+                    {periodEntries.length} no período
+                  </span>
+                </header>
 
-        {/* View statement button */}
-        <button
-          type="button"
-          onClick={() => setShowStatement(true)}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-        >
-          <FileText className="size-4" />
-          Ver extrato
-        </button>
+                {recent.length === 0 ? (
+                  <div className="px-5 py-8 text-center">
+                    <p className="text-sm text-muted-foreground">Nenhum lançamento ainda.</p>
+                    <p className="mt-1 text-xs text-muted-foreground/60">
+                      Use o formulário acima para lançar o primeiro valor de {list.name}.
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-border">
+                    {recent.map((entry) => (
+                      <EntryRow
+                        key={entry.id}
+                        entry={entry}
+                        lists={lists}
+                        onSave={onEditEntry}
+                        onDelete={onDeleteEntry}
+                        onError={onError}
+                      />
+                    ))}
+                  </ul>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowStatement(true)}
+                  className="flex w-full items-center justify-center gap-2 border-t border-border bg-secondary/40 px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  <FileText className="size-4" />
+                  Ver extrato completo
+                </button>
+              </section>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

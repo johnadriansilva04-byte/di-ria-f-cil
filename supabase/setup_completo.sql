@@ -72,3 +72,71 @@ ALTER TABLE public.lancamentos ADD COLUMN IF NOT EXISTS lista_id UUID NULL;
 
 -- Revogar permissão de execução da função por segurança
 REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon, authenticated, PUBLIC;
+
+-- ============================================================
+-- LISTAS (caixas) independentes
+-- ============================================================
+-- Cada lista (Meu Trabalho, Pizzaria, ...) é uma linha real aqui e
+-- cada lançamento carrega seu lista_id. É isso que isola os dados:
+-- sem lista_id o lançamento aparecia em todas as listas.
+--
+-- Quem já tem lançamentos antigos (lista_id nulo) recebe uma lista
+-- "Meu Trabalho" e esses lançamentos são adotados por ela. Nada é apagado.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.listas (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  nome TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.listas TO authenticated;
+GRANT ALL ON public.listas TO service_role;
+
+ALTER TABLE public.listas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Usuario gerencia suas listas" ON public.listas;
+CREATE POLICY "Usuario gerencia suas listas" ON public.listas FOR ALL TO authenticated
+USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS listas_user_created_idx ON public.listas (user_id, created_at);
+CREATE INDEX IF NOT EXISTS lancamentos_lista_idx ON public.lancamentos (user_id, lista_id, data DESC);
+CREATE INDEX IF NOT EXISTS lancamentos_user_idx ON public.lancamentos (user_id, data DESC);
+
+-- Ao excluir uma lista, os lançamentos dela vão junto
+ALTER TABLE public.lancamentos DROP CONSTRAINT IF EXISTS lancamentos_lista_id_fkey;
+ALTER TABLE public.lancamentos ADD CONSTRAINT lancamentos_lista_id_fkey
+  FOREIGN KEY (lista_id) REFERENCES public.listas (id) ON DELETE CASCADE;
+
+-- Lançamentos antigos passam a pertencer à lista do usuário
+DO $$
+DECLARE
+  r RECORD;
+  destino UUID;
+BEGIN
+  FOR r IN SELECT DISTINCT user_id FROM public.lancamentos WHERE lista_id IS NULL LOOP
+    SELECT id INTO destino
+      FROM public.listas
+     WHERE user_id = r.user_id
+     ORDER BY created_at ASC
+     LIMIT 1;
+
+    IF destino IS NULL THEN
+      INSERT INTO public.listas (user_id, nome)
+      VALUES (r.user_id, 'Meu Trabalho')
+      RETURNING id INTO destino;
+    END IF;
+
+    UPDATE public.lancamentos
+       SET lista_id = destino
+     WHERE user_id = r.user_id AND lista_id IS NULL;
+  END LOOP;
+END $$;
+
+-- Tempo real: o app se atualiza quando o lançamento vem de outro aparelho
+ALTER TABLE public.lancamentos REPLICA IDENTITY FULL;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.lancamentos;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
