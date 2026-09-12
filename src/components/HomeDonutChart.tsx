@@ -98,7 +98,7 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
       </header>
 
       {/* Donut fixo à esquerda + cards dos caixas (grid 3 colunas) à direita */}
-      <div className="flex flex-col items-center gap-5 lg:flex-row lg:items-start lg:gap-8">
+      <div className="flex flex-col items-center gap-6 lg:flex-row lg:items-start lg:gap-16">
         {/* Donut à esquerda */}
         <div className="shrink-0">
           <div className="relative size-44 sm:size-48 lg:size-56">
@@ -156,9 +156,9 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
           </div>
         </div>
 
-        {/* Cards dos caixas: grade de 3 colunas à direita */}
+        {/* Cards dos caixas: grade de 3 colunas à direita (quadradinhos ~20% menores) */}
         <div className="w-full min-w-0 lg:w-auto">
-          <ul className="grid w-full grid-cols-3 gap-2">
+          <ul className="grid w-full grid-cols-3 gap-2 lg:w-96 lg:grid-cols-3">
             {shown.map((d, index) => {
               const s = byList[d.id] ?? {
                 income: 0,
@@ -172,20 +172,20 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
                     type="button"
                     onClick={() => onOpenList?.(d.id)}
                     aria-label={`Abrir caixa ${d.name}`}
-                    className="group flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-xl border border-border bg-card px-1.5 py-2 text-center shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
+                    className="group flex aspect-square w-full flex-col items-center justify-center gap-0.5 rounded-xl border border-border bg-card px-1 py-1.5 text-center shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]"
                   >
                     <span
-                      className="size-2.5 shrink-0 rounded-full"
+                      className="size-2 shrink-0 rounded-full"
                       style={{
                         background: DONUT_PALETTE[index % DONUT_PALETTE.length] ?? DONUT_PALETTE[0],
                       }}
                     />
-                    <span className="block w-full truncate text-[11px] font-semibold leading-tight">
+                    <span className="block w-full truncate text-[10px] font-semibold leading-tight">
                       {d.name}
                     </span>
                     <span
                       className={cn(
-                        "block w-full truncate font-[family-name:var(--font-display)] text-xs font-bold tabular-nums leading-tight",
+                        "block w-full truncate font-[family-name:var(--font-display)] text-[11px] font-bold tabular-nums leading-tight",
                         s.balance < 0
                           ? "text-expense"
                           : s.balance > 0
@@ -195,13 +195,13 @@ export function HomeDonutChart({ lists, entries, onOpenList, onOpenSidebar }: Ho
                     >
                       {s.balance >= 0 ? "+" : "−"} {brlCompact(Math.abs(s.balance))}
                     </span>
-                    <span className="flex w-full items-center justify-center gap-2 text-[10px] text-muted-foreground/70">
+                    <span className="flex w-full items-center justify-center gap-1.5 text-[9px] text-muted-foreground/70">
                       <span className="inline-flex items-center gap-0.5">
-                        <TrendingUp className="size-2.5 text-income" />
+                        <TrendingUp className="size-2 text-income" />
                         {brlCompact(s.income)}
                       </span>
                       <span className="inline-flex items-center gap-0.5">
-                        <TrendingDown className="size-2.5 text-expense" />
+                        <TrendingDown className="size-2 text-expense" />
                         {brlCompact(s.expense)}
                       </span>
                     </span>
