@@ -89,12 +89,52 @@ export type Database = {
         };
         Relationships: [];
       };
+      metas: {
+        Row: {
+          id: string;
+          user_id: string;
+          nome: string;
+          valor_alvo: number;
+          valor_atual: number;
+          data_limite: string | null;
+          concluida: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          nome: string;
+          valor_alvo: number;
+          valor_atual?: number;
+          data_limite?: string | null;
+          concluida?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          nome?: string;
+          valor_alvo?: number;
+          valor_atual?: number;
+          data_limite?: string | null;
+          concluida?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
       excluir_minha_conta: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
+      update_meta_timestamp: {
         Args: Record<string, never>;
         Returns: undefined;
       };
