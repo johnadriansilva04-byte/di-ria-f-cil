@@ -13,6 +13,7 @@ interface HomeOverviewProps {
   loading: boolean;
   onOpenList: (id: string) => void;
   onOpenSidebar: () => void;
+  userId: string;
 }
 
 /**
@@ -33,6 +34,7 @@ export function HomeOverview({
   loading,
   onOpenList,
   onOpenSidebar,
+  userId,
 }: HomeOverviewProps) {
   const totals = useMemo(() => totalsOf(entries), [entries]);
 
@@ -50,7 +52,7 @@ export function HomeOverview({
         ) : (
           <div className="flex flex-col gap-4">
             {/* Saldo geral - HERO SECTION */}
-            <section className="relative overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-lg sm:p-8">
+            <section className="relative overflow-hidden rounded-3xl border border-border bg-card p-5 shadow-lg sm:p-8">
               <div
                 aria-hidden
                 className="pointer-events-none absolute inset-0"
@@ -66,31 +68,31 @@ export function HomeOverview({
                 </p>
                 <p
                   className={cn(
-                    "mt-3 font-[family-name:var(--font-display)] text-5xl font-bold tabular-nums tracking-tight sm:text-7xl",
+                    "mt-3 font-[family-name:var(--font-display)] text-4xl font-bold tabular-nums tracking-tight sm:text-5xl lg:text-7xl",
                     totals.balance < 0 ? "text-expense" : "text-foreground",
                   )}
                 >
                   {brl(totals.balance)}
                 </p>
-                <div className="mt-4 flex items-center gap-4">
+                <div className="mt-4 flex items-center gap-3 sm:gap-4">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="size-4 text-income" />
+                    <TrendingUp className="size-3.5 sm:size-4 text-income" />
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                      <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                         Receitas
                       </p>
-                      <p className="font-[family-name:var(--font-display)] text-sm font-bold tabular-nums text-income">
+                      <p className="font-[family-name:var(--font-display)] text-xs sm:text-sm font-bold tabular-nums text-income">
                         {brl(totals.income)}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <TrendingDown className="size-4 text-expense" />
+                    <TrendingDown className="size-3.5 sm:size-4 text-expense" />
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                      <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                         Despesas
                       </p>
-                      <p className="font-[family-name:var(--font-display)] text-sm font-bold tabular-nums text-expense">
+                      <p className="font-[family-name:var(--font-display)] text-xs sm:text-sm font-bold tabular-nums text-expense">
                         {brl(totals.expense)}
                       </p>
                     </div>
@@ -100,17 +102,17 @@ export function HomeOverview({
             </section>
 
             {/* Premium Insights Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FinancialHealth entries={entries} lists={lists} />
               <CashFlow entries={entries} />
             </div>
 
             <SmartInsights entries={entries} lists={lists} />
 
-            <FinancialGoals currentBalance={totals.balance} />
+            <FinancialGoals currentBalance={totals.balance} userId={userId} />
 
             {/* Quick access to wallets */}
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-[family-name:var(--font-display)] text-sm font-bold tracking-tight">
                   Meus Caixas
@@ -119,7 +121,7 @@ export function HomeOverview({
               </div>
 
               {lists.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 px-5 py-8 text-center">
+                <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 px-4 py-6 sm:px-5 sm:py-8 text-center">
                   <p className="text-sm text-muted-foreground">Você ainda não tem caixas.</p>
                   <button
                     type="button"
@@ -140,17 +142,17 @@ export function HomeOverview({
                         key={list.id}
                         type="button"
                         onClick={() => onOpenList(list.id)}
-                        className="group flex flex-col items-start gap-2 p-4 rounded-xl border border-border bg-secondary/30 hover:border-primary/40 hover:bg-secondary/50 transition-all active:scale-[0.98]"
+                        className="group flex flex-col items-start gap-2 p-3 sm:p-4 rounded-xl border border-border bg-secondary/30 hover:border-primary/40 hover:bg-secondary/50 transition-all active:scale-[0.98]"
                       >
                         <div className="flex items-center justify-between w-full">
-                          <span className="text-sm font-semibold truncate">{list.name}</span>
-                          <ArrowRight className="size-4 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+                          <span className="text-xs sm:text-sm font-semibold truncate">{list.name}</span>
+                          <ArrowRight className="size-3.5 sm:size-4 text-muted-foreground/50 group-hover:text-primary transition-colors" />
                         </div>
                         <div className="flex items-center justify-between w-full">
-                          <span className="text-[10px] text-muted-foreground">{listTotals.count} lançamentos</span>
+                          <span className="text-[9px] sm:text-[10px] text-muted-foreground">{listTotals.count} lançamentos</span>
                           <span
                             className={cn(
-                              "font-[family-name:var(--font-display)] text-sm font-bold tabular-nums",
+                              "font-[family-name:var(--font-display)] text-xs sm:text-sm font-bold tabular-nums",
                               listTotals.balance < 0 ? "text-expense" : listTotals.balance > 0 ? "text-income" : "text-muted-foreground",
                             )}
                           >

@@ -1,76 +1,54 @@
-import { useState, useMemo } from "react";
-import { Target, Plus, X, Check, Trash2, Calendar } from "lucide-react";
+import { useState } from "react";
+import { Target, Plus, X, Check, Trash2, Calendar, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { brl, formatDate, addDays, today } from "@/lib/caixa";
-
-interface Goal {
-  id: string;
-  name: string;
-  target: number;
-  current: number;
-  deadline: string;
-  createdAt: string;
-}
+import { useMetas, type Meta } from "@/hooks/use-metas";
 
 interface FinancialGoalsProps {
   currentBalance: number;
+  userId: string;
 }
 
-const STORAGE_KEY = "financial_goals";
-
-export function FinancialGoals({ currentBalance }: FinancialGoalsProps) {
-  const [goals, setGoals] = useState<Goal[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
+export function FinancialGoals({ currentBalance, userId }: FinancialGoalsProps) {
+  const { metas, loading, addMeta, deleteMeta, addToMeta } = useMetas(userId);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newGoal, setNewGoal] = useState({ name: "", target: "", deadline: "" });
+  const [busy, setBusy] = useState(false);
 
-  const saveGoals = (updatedGoals: Goal[]) => {
+  const handleAddGoal = async () => {
+    if (!newGoal.name.trim() || !newGoal.target || !newGoal.deadline) return;
+
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedGoals));
-      setGoals(updatedGoals);
-    } catch {
-      // Storage might be full or blocked
+      setBusy(true);
+      await addMeta({
+        nome: newGoal.name.trim(),
+        valor_alvo: parseFloat(newGoal.target),
+        valor_atual: 0,
+        data_limite: newGoal.deadline,
+        concluida: false,
+      });
+      setNewGoal({ name: "", target: "", deadline: "" });
+      setShowAddForm(false);
+    } catch (e) {
+      console.error("Erro ao criar meta:", e);
+    } finally {
+      setBusy(false);
     }
   };
 
-  const addGoal = () => {
-    if (!newGoal.name.trim() || !newGoal.target || !newGoal.deadline) return;
-
-    const goal: Goal = {
-      id: Date.now().toString(),
-      name: newGoal.name.trim(),
-      target: parseFloat(newGoal.target),
-      current: 0,
-      deadline: newGoal.deadline,
-      createdAt: today(),
-    };
-
-    saveGoals([...goals, goal]);
-    setNewGoal({ name: "", target: "", deadline: "" });
-    setShowAddForm(false);
+  const handleDeleteGoal = async (id: string) => {
+    try {
+      await deleteMeta(id);
+    } catch (e) {
+      console.error("Erro ao excluir meta:", e);
+    }
   };
 
-  const updateGoalProgress = (id: string, amount: number) => {
-    const updated = goals.map((g) => (g.id === id ? { ...g, current: Math.min(g.current + amount, g.target) } : g));
-    saveGoals(updated);
-  };
-
-  const deleteGoal = (id: string) => {
-    saveGoals(goals.filter((g) => g.id !== id));
-  };
-
-  const calculateEstimatedCompletion = (goal: Goal) => {
-    if (goal.current >= goal.target) return "Concluída!";
+  const calculateEstimatedCompletion = (meta: Meta) => {
+    if (meta.concluida || meta.valor_atual >= meta.valor_alvo) return "Concluída!";
     if (currentBalance <= 0) return "Sem saldo disponível";
 
-    const remaining = goal.target - goal.current;
+    const remaining = meta.valor_alvo - meta.valor_atual;
     const monthsNeeded = Math.ceil(remaining / currentBalance);
     const completionDate = addDays(today(), monthsNeeded * 30);
 
@@ -132,15 +110,20 @@ export function FinancialGoals({ currentBalance }: FinancialGoalsProps) {
           />
           <button
             type="button"
-            onClick={addGoal}
-            className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            onClick={handleAddGoal}
+            disabled={busy}
+            className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
-            Criar meta
+            {busy ? <Loader2 className="size-4 animate-spin mx-auto" /> : "Criar meta"}
           </button>
         </div>
       )}
 
-      {goals.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : metas.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 px-5 py-8 text-center">
           <Target className="size-8 text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">Sem metas definidas</p>
@@ -148,24 +131,24 @@ export function FinancialGoals({ currentBalance }: FinancialGoalsProps) {
         </div>
       ) : (
         <div className="space-y-3">
-          {goals.map((goal) => {
-            const progress = (goal.current / goal.target) * 100;
-            const isCompleted = progress >= 100;
+          {metas.map((meta) => {
+            const progress = (meta.valor_atual / meta.valor_alvo) * 100;
+            const isCompleted = meta.concluida || progress >= 100;
 
             return (
-              <div key={goal.id} className="p-3 rounded-xl bg-secondary/30 border border-border/50">
+              <div key={meta.id} className="p-3 rounded-xl bg-secondary/30 border border-border/50">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
-                    <p className="text-xs font-medium">{goal.name}</p>
+                    <p className="text-xs font-medium">{meta.nome}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {brl(goal.current)} de {brl(goal.target)}
+                      {brl(meta.valor_atual)} de {brl(meta.valor_alvo)}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
                     {isCompleted && <Check className="size-3.5 text-income" />}
                     <button
                       type="button"
-                      onClick={() => deleteGoal(goal.id)}
+                      onClick={() => handleDeleteGoal(meta.id)}
                       className="rounded-md p-1 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10"
                     >
                       <Trash2 className="size-3" />
@@ -187,7 +170,7 @@ export function FinancialGoals({ currentBalance }: FinancialGoalsProps) {
                   <span className="text-[10px] text-muted-foreground">{progress.toFixed(0)}% concluído</span>
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                     <Calendar className="size-3" />
-                    <span>{calculateEstimatedCompletion(goal)}</span>
+                    <span>{calculateEstimatedCompletion(meta)}</span>
                   </div>
                 </div>
               </div>

@@ -414,6 +414,7 @@ function Dashboard({ session }: { session: Session }) {
               loading={caixa.loading}
               onOpenList={handleSelectList}
               onOpenSidebar={() => setMobileSidebarOpen(true)}
+              userId={userId}
             />
           ) : caixa.activeList ? (
             <WalletDashboard
