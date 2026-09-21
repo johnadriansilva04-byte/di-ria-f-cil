@@ -35,6 +35,14 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
+-- Troféu conquistado em outro aparelho aparece aqui na hora
+ALTER TABLE public.conquistas REPLICA IDENTITY FULL;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.conquistas;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 -- ============================================================
 -- EXCLUSÃO DA PRÓPRIA CONTA (tudo do usuário sai do banco)
 -- ============================================================
@@ -53,6 +61,7 @@ BEGIN
 
   DELETE FROM public.lancamentos WHERE user_id = uid;
   DELETE FROM public.listas WHERE user_id = uid;
+  DELETE FROM public.conquistas WHERE user_id = uid;
   DELETE FROM public.metas WHERE user_id = uid;
   DELETE FROM public.perfis WHERE id = uid;
   DELETE FROM auth.users WHERE id = uid;

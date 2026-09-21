@@ -19,11 +19,16 @@ GRANT ALL ON public.listas TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.metas TO authenticated;
 GRANT ALL ON public.metas TO service_role;
 
+-- Permissões para conquistas
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.conquistas TO authenticated;
+GRANT ALL ON public.conquistas TO service_role;
+
 -- Habilitar RLS
 ALTER TABLE public.lancamentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.perfis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.listas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.metas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conquistas ENABLE ROW LEVEL SECURITY;
 
 -- RLS para lancamentos
 DROP POLICY IF EXISTS "Usuario gerencia seus lancamentos" ON public.lancamentos;
@@ -43,4 +48,9 @@ USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 -- RLS para metas
 DROP POLICY IF EXISTS "Usuario gerencia suas metas" ON public.metas;
 CREATE POLICY "Usuario gerencia suas metas" ON public.metas FOR ALL TO authenticated
+USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- RLS para conquistas
+DROP POLICY IF EXISTS "Usuario gerencia suas conquistas" ON public.conquistas;
+CREATE POLICY "Usuario gerencia suas conquistas" ON public.conquistas FOR ALL TO authenticated
 USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);

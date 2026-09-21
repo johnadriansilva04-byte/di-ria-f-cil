@@ -1,11 +1,16 @@
-import { Suspense, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TrendingDown, TrendingUp, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 import { brl, totalsOf, type Entry, type WalletList } from "@/lib/caixa";
+import { playTrophy } from "@/lib/sfx";
+import { useMetas } from "@/hooks/use-metas";
+import { useConquistas } from "@/hooks/use-conquistas";
 import { cn } from "@/lib/utils";
 import { FinancialHealth } from "./FinancialHealth";
 import { SmartInsights } from "./SmartInsights";
 import { CashFlow } from "./CashFlow";
 import { FinancialGoals } from "./FinancialGoals";
+import { SalaDeTrofeus } from "./SalaDeTrofeus";
 
 interface HomeOverviewProps {
   lists: WalletList[];
@@ -37,6 +42,30 @@ export function HomeOverview({
   userId,
 }: HomeOverviewProps) {
   const totals = useMemo(() => totalsOf(entries), [entries]);
+  const { metas, loading: metasLoading, addMeta, deleteMeta, addToMeta } = useMetas(userId);
+  const [novoTipo, setNovoTipo] = useState<string | null>(null);
+  const brilhoTimer = useRef<number | null>(null);
+
+  // O troféu nasce do próprio hook: aqui só sobra avisar o usuário.
+  const { catalogo, loading: trofeusLoading, tabelaFaltando } = useConquistas(userId, metas, {
+    onDesbloqueio: (conquista) => {
+      toast.success(`Troféu conquistado: ${conquista.titulo}`, {
+        description: conquista.descricao,
+      });
+      playTrophy();
+      setNovoTipo(conquista.tipo);
+    },
+  });
+
+  // O brilho é só de estreia: some sozinho para o selo não ficar piscando.
+  useEffect(() => {
+    if (!novoTipo) return;
+    if (brilhoTimer.current) window.clearTimeout(brilhoTimer.current);
+    brilhoTimer.current = window.setTimeout(() => setNovoTipo(null), 1400);
+    return () => {
+      if (brilhoTimer.current) window.clearTimeout(brilhoTimer.current);
+    };
+  }, [novoTipo]);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -109,7 +138,21 @@ export function HomeOverview({
 
             <SmartInsights entries={entries} lists={lists} />
 
-            <FinancialGoals currentBalance={totals.balance} userId={userId} />
+              <FinancialGoals
+                currentBalance={totals.balance}
+                metas={metas}
+                loading={metasLoading}
+                addMeta={addMeta}
+                deleteMeta={deleteMeta}
+                addToMeta={addToMeta}
+              />
+
+              <SalaDeTrofeus
+                catalogo={catalogo}
+                loading={trofeusLoading}
+                tabelaFaltando={tabelaFaltando}
+                novoTipo={novoTipo}
+              />
 
             {/* Quick access to wallets */}
             <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">

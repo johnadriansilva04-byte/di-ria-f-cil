@@ -8,6 +8,39 @@ export type Database = {
   };
   public: {
     Tables: {
+      conquistas: {
+        Row: {
+          data_conquistada: string;
+          descricao: string;
+          icone: string;
+          id: string;
+          meta_id: string | null;
+          tipo: string;
+          titulo: string;
+          user_id: string;
+        };
+        Insert: {
+          data_conquistada?: string;
+          descricao: string;
+          icone: string;
+          id?: string;
+          meta_id?: string | null;
+          tipo: string;
+          titulo: string;
+          user_id: string;
+        };
+        Update: {
+          data_conquistada?: string;
+          descricao?: string;
+          icone?: string;
+          id?: string;
+          meta_id?: string | null;
+          tipo?: string;
+          titulo?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       listas: {
         Row: {
           created_at: string;

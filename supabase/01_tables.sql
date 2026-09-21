@@ -45,3 +45,17 @@ CREATE TABLE IF NOT EXISTS public.metas (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
+
+-- Tabela de conquistas (troféus). Só nasce troféu de meta concluída,
+-- e o par (user_id, tipo) é único: o mesmo troféu nunca sai duas vezes.
+CREATE TABLE IF NOT EXISTS public.conquistas (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  tipo TEXT NOT NULL,
+  titulo TEXT NOT NULL,
+  descricao TEXT NOT NULL,
+  icone TEXT NOT NULL,
+  meta_id UUID,
+  data_conquistada TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  CONSTRAINT conquistas_tipo_unico UNIQUE (user_id, tipo)
+);

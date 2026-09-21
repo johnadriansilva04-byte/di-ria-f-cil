@@ -9,12 +9,18 @@ CREATE INDEX IF NOT EXISTS lancamentos_lista_idx ON public.lancamentos (user_id,
 CREATE INDEX IF NOT EXISTS lancamentos_user_idx ON public.lancamentos (user_id, data DESC);
 CREATE INDEX IF NOT EXISTS listas_user_created_idx ON public.listas (user_id, created_at);
 CREATE INDEX IF NOT EXISTS metas_user_idx ON public.metas (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS conquistas_user_idx ON public.conquistas (user_id, data_conquistada DESC);
 
 -- Chaves estrangeiras
 -- Ao excluir uma lista, os lançamentos dela vão junto
 ALTER TABLE public.lancamentos DROP CONSTRAINT IF EXISTS lancamentos_lista_id_fkey;
 ALTER TABLE public.lancamentos ADD CONSTRAINT lancamentos_lista_id_fkey
   FOREIGN KEY (lista_id) REFERENCES public.listas (id) ON DELETE CASCADE;
+
+-- Ao excluir a meta, o troféu continua: ele já foi conquistado de verdade.
+ALTER TABLE public.conquistas DROP CONSTRAINT IF EXISTS conquistas_meta_id_fkey;
+ALTER TABLE public.conquistas ADD CONSTRAINT conquistas_meta_id_fkey
+  FOREIGN KEY (meta_id) REFERENCES public.metas (id) ON DELETE SET NULL;
 
 -- Migração de lançamentos antigos para listas
 DO $$

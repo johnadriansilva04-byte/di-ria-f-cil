@@ -4,7 +4,7 @@
 
 Execute os arquivos em ordem no SQL Editor do Supabase:
 
-1. **01_tables.sql** - Cria todas as tabelas (lancamentos, perfis, listas, metas)
+1. **01_tables.sql** - Cria todas as tabelas (lancamentos, perfis, listas, metas, conquistas)
 2. **02_permissions.sql** - Configura permissões e RLS (Row Level Security)
 3. **03_indexes.sql** - Cria índices para performance e chaves estrangeiras
 4. **04_functions.sql** - Configura funções e triggers
@@ -32,6 +32,14 @@ Execute os arquivos em ordem no SQL Editor do Supabase:
 - RLS: Usuário só gerencia suas metas
 - Realtime: Atualizações em tempo real entre dispositivos
 
+### conquistas
+- Sala de Troféus: troféus ganhos ao concluir metas criadas pelo usuário
+- Campos: id, user_id, tipo, titulo, descricao, icone, meta_id, data_conquistada
+- RLS: Usuário só gerencia suas conquistas
+- Único por (user_id, tipo): o mesmo troféu não sai duas vezes
+- meta_id usa ON DELETE SET NULL: excluir a meta não apaga o troféu já ganho
+- Realtime: Atualizações em tempo real entre dispositivos
+
 ## Funções Disponíveis
 
 ### handle_new_user()
@@ -41,7 +49,7 @@ Execute os arquivos em ordem no SQL Editor do Supabase:
 ### excluir_minha_conta()
 - Exclui conta do usuário e todos os dados associados
 - Segurança: Só deleta dados do usuário autenticado
-- Exclui: lancamentos, listas, metas, perfis, auth.users
+- Exclui: lancamentos, listas, conquistas, metas, perfis, auth.users
 
 ### update_meta_timestamp()
 - Atualiza updated_at automaticamente quando meta é modificada
@@ -51,6 +59,7 @@ Execute os arquivos em ordem no SQL Editor do Supabase:
 
 - **lancamentos**: Publicado para atualizações em tempo real
 - **metas**: Publicado para atualizações em tempo real
+- **conquistas**: Publicado para atualizações em tempo real
 
 ## Índices
 
@@ -59,6 +68,7 @@ Execute os arquivos em ordem no SQL Editor do Supabase:
 - lancamentos_user_idx: user_id, data DESC
 - listas_user_created_idx: user_id, created_at
 - metas_user_idx: user_id, created_at DESC
+- conquistas_user_idx: user_id, data_conquistada DESC
 
 ## Migrations
 

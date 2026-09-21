@@ -23,8 +23,8 @@ export function FinancialHealth({ entries, lists }: FinancialHealthProps) {
   const health = useMemo(() => calculateHealth(entries, lists), [entries, lists]);
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+      <div className="mb-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Heart className="size-4" />
@@ -33,10 +33,10 @@ export function FinancialHealth({ entries, lists }: FinancialHealthProps) {
             Saúde Financeira
           </h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-baseline gap-1">
           <span
             className={cn(
-              "font-[family-name:var(--font-display)] text-2xl font-bold tabular-nums",
+              "font-[family-name:var(--font-display)] text-xl font-bold tabular-nums sm:text-2xl",
               health.color,
             )}
           >
@@ -136,9 +136,9 @@ function calculateHealth(entries: Entry[], lists: { id: string; name: string }[]
   }
 
   // Build factors
-  const factors = [
+  const factors: HealthScore["factors"] = [
     {
-      name: "Taxa de economia",
+      name: "Do que entrou, sobrou",
       status: savingsRate >= 10 ? "good" : savingsRate >= 0 ? "warning" : "bad",
       value: `${savingsRate.toFixed(1)}%`,
     },

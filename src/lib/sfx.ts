@@ -141,3 +141,18 @@ export function playTick(): void {
   if (!ac) return;
   tone(ac, { freq: 1320, dur: 0.09, type: "sine", gain: 0.12 });
 }
+
+/**
+ * Troféu conquistado: dois sinos subindo com um brilho por cima.
+ * Mais contido que o "ka-ching" do ganho, para não competir com ele.
+ */
+export function playTrophy(): void {
+  if (!isSoundEnabled()) return;
+  const ac = audio();
+  if (!ac) return;
+
+  tone(ac, { freq: 880, dur: 0.2, type: "triangle", gain: 0.13 }); // lá
+  tone(ac, { freq: 1318.5, dur: 0.45, type: "sine", gain: 0.12, start: 0.11 }); // mi agudo
+  tone(ac, { freq: 1760, dur: 0.5, type: "sine", gain: 0.06, start: 0.11 });
+  noise(ac, { start: 0.1, dur: 0.34, gain: 0.04, freq: 9000, q: 0.6 });
+}
