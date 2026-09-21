@@ -1,8 +1,7 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, FileText, Lock, Pencil, X } from "lucide-react";
 import {
   filterByPeriod,
-  monthlySeries,
   totalsOf,
   type Entry,
   type EntryPatch,
@@ -31,11 +30,7 @@ interface WalletDashboardProps {
   onError: (msg: string | null) => void;
 }
 
-const RECENT_LIMIT = 6;
-
-// A biblioteca de gráficos é pesada: só é baixada quando o gráfico aparece,
-// depois da primeira pintura. Em celular fraco isso adianta o app na tela.
-const FlowChart = lazy(() => import("./FlowChart").then((m) => ({ default: m.FlowChart })));
+const RECENT_LIMIT = 5;
 
 export function WalletDashboard({
   list,
@@ -52,7 +47,6 @@ export function WalletDashboard({
   onLaunched,
   onError,
 }: WalletDashboardProps) {
-  // "Tudo" é o saldo real do caixa; os outros períodos são lentes de análise.
   const [period, setPeriod] = useState<Period>("tudo");
   const [showStatement, setShowStatement] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -66,7 +60,6 @@ export function WalletDashboard({
 
   const periodEntries = useMemo(() => filterByPeriod(entries, period), [entries, period]);
   const totals = useMemo(() => totalsOf(periodEntries), [periodEntries]);
-  const series = useMemo(() => monthlySeries(entries, 6), [entries]);
   const recent = periodEntries.slice(0, RECENT_LIMIT);
 
   const commitRename = () => {
@@ -97,11 +90,10 @@ export function WalletDashboard({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
-        {/* Cabeçalho da lista ativa */}
-        <header className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
+        <header className="mb-6 flex items-center justify-between">
           {editingName ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1">
               <input
                 autoFocus
                 value={nameValue}
@@ -113,7 +105,7 @@ export function WalletDashboard({
                     setEditingName(false);
                   }
                 }}
-                className="rounded-lg border border-input bg-background px-3 py-1.5 font-[family-name:var(--font-display)] text-lg font-bold outline-none focus:border-ring focus:ring-1 focus:ring-ring/30"
+                className="flex-1 rounded-lg border border-input bg-background px-3 py-2 font-[family-name:var(--font-display)] text-lg font-bold outline-none focus:border-ring focus:ring-1 focus:ring-ring/30"
               />
               <button
                 type="button"
@@ -136,8 +128,8 @@ export function WalletDashboard({
               </button>
             </div>
           ) : (
-            <>
-              <h1 className="font-[family-name:var(--font-display)] text-xl font-bold tracking-tight sm:text-2xl">
+            <div className="flex items-center gap-3">
+              <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight">
                 {list.name}
               </h1>
               <button
@@ -149,25 +141,20 @@ export function WalletDashboard({
               >
                 <Pencil className="size-4" />
               </button>
-              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                <Lock className="size-3" />
-                lançamentos só desta lista
-              </span>
-            </>
+            </div>
           )}
         </header>
 
         {loading ? (
-          <div className="grid gap-3">
-            <div className="h-36 animate-pulse rounded-2xl border border-border bg-card" />
-            <div className="grid grid-cols-3 gap-3">
-              <div className="h-20 animate-pulse rounded-xl border border-border bg-card" />
-              <div className="h-20 animate-pulse rounded-xl border border-border bg-card" />
-              <div className="h-20 animate-pulse rounded-xl border border-border bg-card" />
+          <div className="grid gap-4">
+            <div className="h-40 animate-pulse rounded-2xl border border-border bg-card" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="h-32 animate-pulse rounded-xl border border-border bg-card" />
+              <div className="h-32 animate-pulse rounded-xl border border-border bg-card" />
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6">
+          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-6">
             <div className="flex flex-col gap-4">
               <WalletSummary
                 listName={list.name}
@@ -175,13 +162,6 @@ export function WalletDashboard({
                 period={period}
                 onPeriodChange={setPeriod}
               />
-              <Suspense
-                fallback={
-                  <div className="h-64 animate-pulse rounded-2xl border border-border bg-card" />
-                }
-              >
-                <FlowChart data={series} listName={list.name} />
-              </Suspense>
             </div>
 
             <div className="flex flex-col gap-4 lg:sticky lg:top-4">
@@ -196,12 +176,12 @@ export function WalletDashboard({
               />
 
               <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                <header className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
+                <header className="flex items-center justify-between border-b border-border px-4 py-3">
                   <h2 className="font-[family-name:var(--font-display)] text-sm font-bold tracking-tight">
-                    Últimos lançamentos
+                    Recentes
                   </h2>
                   <span className="text-[11px] text-muted-foreground">
-                    {periodEntries.length} no período
+                    {periodEntries.length} lançamentos
                   </span>
                 </header>
 
@@ -209,7 +189,7 @@ export function WalletDashboard({
                   <div className="px-5 py-8 text-center">
                     <p className="text-sm text-muted-foreground">Nenhum lançamento ainda.</p>
                     <p className="mt-1 text-xs text-muted-foreground/60">
-                      Use o formulário acima para lançar o primeiro valor de {list.name}.
+                      Use o formulário acima para começar.
                     </p>
                   </div>
                 ) : (
@@ -227,14 +207,16 @@ export function WalletDashboard({
                   </ul>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => setShowStatement(true)}
-                  className="flex w-full items-center justify-center gap-2 border-t border-border bg-secondary/40 px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                >
-                  <FileText className="size-4" />
-                  Ver extrato completo
-                </button>
+                {periodEntries.length > RECENT_LIMIT && (
+                  <button
+                    type="button"
+                    onClick={() => setShowStatement(true)}
+                    className="flex w-full items-center justify-center gap-2 border-t border-border bg-secondary/40 px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    <FileText className="size-4" />
+                    Ver extrato completo
+                  </button>
+                )}
               </section>
             </div>
           </div>

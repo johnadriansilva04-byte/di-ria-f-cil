@@ -24,8 +24,8 @@ interface TransactionFormProps {
 }
 
 const SUGGESTIONS: Record<Kind, string[]> = {
-  entrada: ["Diária na obra", "Serviço", "Venda", "Horas extras"],
-  saida: ["Combustível", "Alimentação", "Material", "Ingredientes"],
+  entrada: ["Diária", "Serviço", "Venda", "Extra"],
+  saida: ["Alimentação", "Transporte", "Lazer", "Contas"],
 };
 
 const labelClass =
@@ -49,12 +49,12 @@ export function TransactionForm({
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showExtras, setShowExtras] = useState(false);
+  const [showDate, setShowDate] = useState(false);
   const [dailyLocal, setDailyLocal] = useState(daily);
   const [hourRateLocal, setHourRateLocal] = useState(hourRate);
   const [hours, setHours] = useState("");
   const [detail, setDetail] = useState<string | undefined>(undefined);
 
-  // A diária do perfil já vem preenchida: "Recebi a diária" fica em 1 toque.
   useEffect(() => {
     if (!touched && kind === "entrada" && daily) setAmount(daily);
   }, [daily, kind, touched]);
@@ -87,7 +87,6 @@ export function TransactionForm({
       onError("Informe um valor maior que zero para lançar.");
       return;
     }
-    // O navegador só libera áudio dentro do gesto do usuário.
     primeAudio();
     setBusy(true);
     onError(null);
@@ -99,7 +98,6 @@ export function TransactionForm({
         detail: kind === "entrada" ? detail : undefined,
         date: date || today(),
       });
-      // Confirmação visual + som do lançamento (verde no ganho, vermelho no gasto).
       onLaunched(entry);
       setLabel("");
       setHours("");
@@ -114,7 +112,7 @@ export function TransactionForm({
   };
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <header className="mb-4 flex items-center gap-2">
         <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Wallet className="size-3.5" />
@@ -123,12 +121,11 @@ export function TransactionForm({
           <h2 className="font-[family-name:var(--font-display)] text-sm font-bold tracking-tight">
             Novo lançamento
           </h2>
-          <p className="truncate text-[11px] text-muted-foreground">em {listName}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{listName}</p>
         </div>
       </header>
 
-      {/* Receber / Gastar */}
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-secondary p-1">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-secondary p-1 mb-4">
         {(
           [
             { id: "entrada" as Kind, text: "Receber", Icon: ArrowUpCircle },
@@ -154,14 +151,10 @@ export function TransactionForm({
         ))}
       </div>
 
-      <div className="mt-4 space-y-3">
-        {/* Valor */}
+      <div className="space-y-3">
         <label className="block">
-          <span className={labelClass}>
-            {kind === "entrada" ? "Quanto recebeu (R$)" : "Quanto gastou (R$)"}
-          </span>
-          <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring/30">
-            <span className="font-[family-name:var(--font-display)] text-lg font-bold text-muted-foreground/50">
+          <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-4 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring/30">
+            <span className="font-[family-name:var(--font-display)] text-xl font-bold text-muted-foreground/50">
               R$
             </span>
             <input
@@ -176,25 +169,22 @@ export function TransactionForm({
               placeholder="0,00"
               aria-label="Valor"
               className={cn(
-                "w-full bg-transparent py-3 font-[family-name:var(--font-display)] text-2xl font-bold tabular-nums outline-none placeholder:text-muted-foreground/30",
+                "w-full bg-transparent py-4 font-[family-name:var(--font-display)] text-3xl font-bold tabular-nums outline-none placeholder:text-muted-foreground/30",
                 kind === "entrada" ? "text-income" : "text-expense",
               )}
             />
           </div>
         </label>
 
-        {/* Descrição */}
         <label className="block">
-          <span className={labelClass}>
-            {kind === "entrada" ? "Do que é" : "Do que foi o gasto"}
-          </span>
+          <span className={labelClass}>Descrição</span>
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") void submit();
             }}
-            placeholder={kind === "entrada" ? "Ex: Diária na obra" : "Ex: Combustível"}
+            placeholder={kind === "entrada" ? "Ex: Diária" : "Ex: Alimentação"}
             className={inputClass}
           />
         </label>
@@ -212,22 +202,28 @@ export function TransactionForm({
           ))}
         </div>
 
-        {/* Data (preenchida sozinha, mas dá pra lançar ontem) */}
-        <label className="block">
-          <span className={labelClass}>Data</span>
-          <div className="flex items-center gap-2 rounded-lg border border-input bg-background px-3 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring/30">
-            <Calendar className="size-4 text-muted-foreground/50" />
-            <input
-              type="date"
-              value={date}
-              max={today()}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-transparent py-2.5 text-sm tabular-nums outline-none"
-            />
-          </div>
-        </label>
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setShowDate(!showDate)}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <Calendar className="size-4" />
+            {showDate ? "Ocultar data" : "Alterar data"}
+          </button>
+          <span className="text-xs text-muted-foreground">{formatDate(date)}</span>
+        </div>
 
-        {/* Diária + horas extras (opcional) */}
+        {showDate && (
+          <input
+            type="date"
+            value={date}
+            max={today()}
+            onChange={(e) => setDate(e.value)}
+            className={inputClass}
+          />
+        )}
+
         {kind === "entrada" ? (
           <div className="rounded-xl border border-border/70 bg-secondary/30">
             <button
@@ -306,9 +302,14 @@ export function TransactionForm({
           )}
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-          {kind === "entrada" ? "+ Lançar recebimento" : "+ Lançar gasto"}
+          {kind === "entrada" ? "+ Lançar receita" : "+ Lançar despesa"}
         </button>
       </div>
     </section>
   );
+}
+
+function formatDate(iso: string) {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
 }

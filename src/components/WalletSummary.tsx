@@ -1,4 +1,4 @@
-import { ListChecks, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { brl, PERIODS, type Period, type Totals } from "@/lib/caixa";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +11,8 @@ interface WalletSummaryProps {
 
 export function WalletSummary({ listName, totals, period, onPeriodChange }: WalletSummaryProps) {
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
+      {/* Period Selector - Simplified */}
       <div className="flex flex-wrap items-center gap-1.5">
         {PERIODS.map((p) => (
           <button
@@ -31,7 +32,8 @@ export function WalletSummary({ listName, totals, period, onPeriodChange }: Wall
         ))}
       </div>
 
-      <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm">
+      {/* Main Balance Card - Cleaner Design */}
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
@@ -40,61 +42,53 @@ export function WalletSummary({ listName, totals, period, onPeriodChange }: Wall
               "radial-gradient(45% 120% at 100% 0%, oklch(0.65 0.12 255 / 0.14), transparent 70%)",
           }}
         />
-        <div className="relative flex items-center gap-2">
-          <div className="flex size-7 items-center justify-center rounded-lg bg-primary/15 text-primary">
-            <Wallet className="size-3.5" />
-          </div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
-            Saldo de {listName}
-          </p>
-        </div>
-        <p
-          className={cn(
-            "relative mt-2 font-[family-name:var(--font-display)] text-4xl font-bold tabular-nums tracking-tight sm:text-5xl",
-            totals.balance < 0 ? "text-expense" : "text-foreground",
-          )}
-        >
-          {brl(totals.balance)}
-        </p>
-        <p className="relative mt-1.5 text-xs text-muted-foreground">
-          {totals.count === 0
-            ? "Nenhum lançamento neste período"
-            : `${totals.count} ${totals.count === 1 ? "lançamento" : "lançamentos"} neste período · apenas desta lista`}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <div className="rounded-xl border border-border bg-card px-3 py-3 sm:px-4">
-          <div className="flex items-center gap-1.5">
-            <TrendingUp className="size-3.5 text-income" />
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-              Recebido
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <Wallet className="size-3.5" />
+            </div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+              {listName}
             </p>
           </div>
-          <p className="mt-1.5 truncate font-[family-name:var(--font-display)] text-base font-bold tabular-nums text-income sm:text-lg">
+          <p
+            className={cn(
+              "font-[family-name:var(--font-display)] text-4xl font-bold tabular-nums tracking-tight sm:text-5xl",
+              totals.balance < 0 ? "text-expense" : "text-foreground",
+            )}
+          >
+            {brl(totals.balance)}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {totals.count === 0
+              ? "Nenhum lançamento neste período"
+              : `${totals.count} ${totals.count === 1 ? "lançamento" : "lançamentos"}`}
+          </p>
+        </div>
+      </div>
+
+      {/* Income/Expense Summary - Simplified */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl border border-border bg-card px-4 py-4">
+          <div className="flex items-center gap-1.5 mb-2">
+            <TrendingUp className="size-3.5 text-income" />
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+              Receitas
+            </p>
+          </div>
+          <p className="font-[family-name:var(--font-display)] text-lg font-bold tabular-nums text-income">
             {brl(totals.income)}
           </p>
         </div>
-        <div className="rounded-xl border border-border bg-card px-3 py-3 sm:px-4">
-          <div className="flex items-center gap-1.5">
+        <div className="rounded-xl border border-border bg-card px-4 py-4">
+          <div className="flex items-center gap-1.5 mb-2">
             <TrendingDown className="size-3.5 text-expense" />
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-              Gasto
+              Despesas
             </p>
           </div>
-          <p className="mt-1.5 truncate font-[family-name:var(--font-display)] text-base font-bold tabular-nums text-expense sm:text-lg">
+          <p className="font-[family-name:var(--font-display)] text-lg font-bold tabular-nums text-expense">
             {brl(totals.expense)}
-          </p>
-        </div>
-        <div className="rounded-xl border border-border bg-card px-3 py-3 sm:px-4">
-          <div className="flex items-center gap-1.5">
-            <ListChecks className="size-3.5 text-primary" />
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-              Lançamentos
-            </p>
-          </div>
-          <p className="mt-1.5 font-[family-name:var(--font-display)] text-base font-bold tabular-nums sm:text-lg">
-            {totals.count}
           </p>
         </div>
       </div>

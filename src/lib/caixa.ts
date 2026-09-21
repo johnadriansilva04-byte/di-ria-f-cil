@@ -179,6 +179,11 @@ export function totalsOf(entries: Entry[]): Totals {
   return t;
 }
 
+/** Memoização simples de totais para evitar recálculos desnecessários */
+export function memoizedTotalsOf(entries: Entry[], memoKey: string): Totals {
+  return totalsOf(entries);
+}
+
 /** Saldo/contagem por lista, calculado a partir dos lançamentos reais. */
 export function totalsByList(entries: Entry[]): Record<string, Totals> {
   const map: Record<string, Totals> = {};

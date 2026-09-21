@@ -303,7 +303,7 @@ export function useCaixa(userId: string) {
     await supabase.auth.signOut();
   }, []);
 
-  const activeList = lists.find((l) => l.id === activeListId) ?? null;
+  const activeList = useMemo(() => lists.find((l) => l.id === activeListId) ?? null, [lists, activeListId]);
   const activeEntries = useMemo(
     () => entries.filter((e) => e.listaId === activeListId),
     [entries, activeListId],
