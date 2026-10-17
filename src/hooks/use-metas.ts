@@ -37,12 +37,12 @@ export function useMetas(userId: string) {
             setMetas((prev) => [...prev, payload.new as Meta]);
           } else if (payload.eventType === "UPDATE") {
             setMetas((prev) =>
-              prev.map((m) => (m.id === payload.new.id ? (payload.new as Meta) : m))
+              prev.map((m) => (m.id === payload.new["id"] ? (payload.new as Meta) : m)),
             );
           } else if (payload.eventType === "DELETE") {
-            setMetas((prev) => prev.filter((m) => m.id !== payload.old.id));
+            setMetas((prev) => prev.filter((m) => m.id !== payload.old["id"]));
           }
-        }
+        },
       )
       .subscribe();
 

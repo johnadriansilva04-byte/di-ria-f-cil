@@ -246,11 +246,13 @@ function Dashboard({ session }: { session: Session }) {
   const handleLaunched = (entry: Entry) => {
     if (entry.kind === "entrada") playGain();
     else playSpend();
+    // Mostra DE ONDE saiu o dinheiro (pode ter saído de um envelope).
+    const origem = entry.listaId ? caixa.lists.find((l) => l.id === entry.listaId) : null;
     setFx({
       id: Date.now(),
       kind: entry.kind,
       amount: entry.amount,
-      listName: caixa.activeList?.name ?? "sua lista",
+      listName: origem?.name ?? caixa.activeList?.name ?? "sua lista",
     });
   };
 
@@ -293,6 +295,7 @@ function Dashboard({ session }: { session: Session }) {
           telefone={telefone}
           onSignOut={() => void supabase.auth.signOut()}
           onDeleteAccount={caixa.deleteAccount}
+          onOtimizar={(dias) => caixa.otimizar(dias)}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
         />
@@ -322,6 +325,7 @@ function Dashboard({ session }: { session: Session }) {
               telefone={telefone}
               onSignOut={() => void supabase.auth.signOut()}
               onDeleteAccount={caixa.deleteAccount}
+              onOtimizar={(dias) => caixa.otimizar(dias)}
               collapsed={false}
               onToggleCollapse={() => setMobileSidebarOpen(false)}
             />
@@ -350,6 +354,7 @@ function Dashboard({ session }: { session: Session }) {
           >
             <PanelLeftOpen className="size-5" />
           </button>
+          {/* No desktop a navegação mora na barra lateral; aqui só no celular. */}
           <button
             type="button"
             onClick={handleGoHome}
@@ -357,7 +362,7 @@ function Dashboard({ session }: { session: Session }) {
             aria-label="Visão geral"
             title="Visão geral"
             className={cn(
-              "flex shrink-0 items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors",
+              "flex shrink-0 items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors lg:hidden",
               view === "home"
                 ? "bg-primary/10 font-semibold text-primary"
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground",
@@ -366,9 +371,9 @@ function Dashboard({ session }: { session: Session }) {
             <LayoutDashboard className="size-4" />
             <span className="hidden sm:inline">Visão geral</span>
           </button>
-          <div className="h-5 w-px bg-border" />
+          <div className="h-5 w-px bg-border lg:hidden" />
           <span className="min-w-0 flex-1 truncate font-[family-name:var(--font-display)] text-sm font-semibold">
-            {view === "home" ? "Easy Account" : caixa.activeList ? caixa.activeList.name : "Caixa"}
+            {view === "home" ? "Visão geral" : caixa.activeList ? caixa.activeList.name : "Caixa"}
           </span>
           <button
             type="button"
@@ -435,6 +440,25 @@ function Dashboard({ session }: { session: Session }) {
               onSavePerfil={(diaria, valorHora) => void caixa.updatePerfil(diaria, valorHora)}
               onLaunched={handleLaunched}
               onError={setActionError}
+              summaries={caixa.summaries}
+              envelopes={caixa.envelopes}
+              onCreateEnvelope={async (name) => {
+                await caixa.addList(name, caixa.activeList?.id);
+              }}
+              onDistribute={async (input) => {
+                await caixa.distribuir({
+                  deId: caixa.activeList!.id,
+                  deNome: caixa.activeList!.name,
+                  paraId: input.paraId,
+                  paraNome: input.paraNome,
+                  amount: input.amount,
+                });
+              }}
+              onOpenEnvelope={handleSelectList}
+              onBackToCaixa={() => {
+                const parentId = caixa.activeList?.parentId;
+                if (parentId) handleSelectList(parentId);
+              }}
             />
           ) : (
             <div className="flex h-full items-center justify-center px-4">

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Lightbulb, TrendingUp, TrendingDown, AlertCircle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { brl, type Entry, friendlyDate, addDays, today } from "@/lib/caixa";
+import { brl, type Entry } from "@/lib/caixa";
 
 interface SmartInsightsProps {
   entries: Entry[];
@@ -35,18 +35,18 @@ export function SmartInsights({ entries, lists }: SmartInsightsProps) {
         </h2>
       </div>
 
-      <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {insights.slice(0, 4).map((insight) => (
           <div
             key={insight.id}
-            className="flex items-start gap-3 p-3 rounded-xl bg-secondary/30 border border-border/50"
+            className="flex items-start gap-3 rounded-xl border border-border/50 bg-secondary/30 p-3"
           >
             <div
               className={cn(
                 "flex size-6 items-center justify-center rounded-lg shrink-0",
                 insight.type === "positive" && "bg-income/10 text-income",
                 insight.type === "negative" && "bg-expense/10 text-expense",
-                insight.type === "warning" && "bg-yellow-500/10 text-yellow-500",
+                insight.type === "warning" && "bg-chart-5/10 text-chart-5",
                 insight.type === "neutral" && "bg-primary/10 text-primary",
               )}
             >
@@ -82,7 +82,10 @@ function generateInsights(entries: Entry[], lists: { id: string; name: string }[
   const lastMonthDate = new Date(thisYear, thisMonth - 1, 1);
   const lastMonthEntries = entries.filter((e) => {
     const date = new Date(e.date);
-    return date.getMonth() === lastMonthDate.getMonth() && date.getFullYear() === lastMonthDate.getFullYear();
+    return (
+      date.getMonth() === lastMonthDate.getMonth() &&
+      date.getFullYear() === lastMonthDate.getFullYear()
+    );
   });
 
   // Calculate totals
@@ -136,7 +139,10 @@ function generateInsights(entries: Entry[], lists: { id: string; name: string }[
         type: percentIncrease > 20 ? "negative" : "warning",
         icon: AlertCircle,
         title: "Gastos aumentaram",
-        description: percentIncrease > 20 ? "Seus gastos aumentaram significativamente" : "Gastos maiores que o mês anterior",
+        description:
+          percentIncrease > 20
+            ? "Seus gastos aumentaram significativamente"
+            : "Gastos maiores que o mês anterior",
         value: `+${brl(expenseChange)} (${percentIncrease.toFixed(0)}%)`,
       });
     } else if (expenseChange < 0) {
@@ -154,11 +160,14 @@ function generateInsights(entries: Entry[], lists: { id: string; name: string }[
   // Find highest expense category
   const expensesByDescription = thisMonthEntries
     .filter((e) => e.kind === "saida")
-    .reduce((acc, e) => {
-      const key = e.label.toLowerCase();
-      acc[key] = (acc[key] || 0) + e.amount;
-      return acc;
-    }, {} as Record<string, number>);
+    .reduce(
+      (acc, e) => {
+        const key = e.label.toLowerCase();
+        acc[key] = (acc[key] || 0) + e.amount;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
   const topExpense = Object.entries(expensesByDescription).sort((a, b) => b[1] - a[1])[0];
 
@@ -179,15 +188,20 @@ function generateInsights(entries: Entry[], lists: { id: string; name: string }[
     return daysSince <= 7;
   });
 
-  if (recentEntries.length === 0 && entries.length > 0) {
-    const lastEntry = entries[0];
-    const daysSinceLastEntry = Math.floor((Date.now() - new Date(lastEntry.date).getTime()) / (1000 * 60 * 60 * 24));
+  const lastEntry = entries[0];
+  if (recentEntries.length === 0 && lastEntry) {
+    const daysSinceLastEntry = Math.floor(
+      (Date.now() - new Date(lastEntry.date).getTime()) / (1000 * 60 * 60 * 24),
+    );
     insights.push({
       id: "no-activity",
       type: "warning",
       icon: AlertCircle,
       title: "Sem atividade recente",
-      description: `Seu último lançamento foi há ${daysSinceLastEntry} dias`,
+      description:
+        daysSinceLastEntry <= 0
+          ? "Faça um lançamento para manter o caixa em dia"
+          : `Seu último lançamento foi há ${daysSinceLastEntry} ${daysSinceLastEntry === 1 ? "dia" : "dias"}`,
     });
   }
 
@@ -203,8 +217,8 @@ function generateInsights(entries: Entry[], lists: { id: string; name: string }[
       id: "negative-balance",
       type: "negative",
       icon: TrendingDown,
-      title: "Saldo negativo",
-      description: "Suas despesas superam suas receitas totais",
+      title: "Dívida acumulada",
+      description: "Suas despesas superaram sua renda — o saldo global está negativo",
       value: brl(totalBalance),
     });
   }

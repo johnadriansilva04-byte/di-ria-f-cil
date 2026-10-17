@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, FileText, Lock, Pencil, X } from "lucide-react";
+import { ArrowLeft, Check, FileText, Pencil, X } from "lucide-react";
 import {
   filterByPeriod,
+  monthlySeries,
   totalsOf,
   type Entry,
   type EntryPatch,
   type Period,
+  type Totals,
   type WalletList,
 } from "@/lib/caixa";
 import type { NewEntry } from "@/hooks/use-caixa";
+import { EnvelopesCard } from "./EnvelopesCard";
 import { EntryRow } from "./EntryRow";
+import { FlowChart } from "./FlowChart";
 import { StatementView } from "./StatementView";
 import { TransactionForm } from "./TransactionForm";
 import { WalletSummary } from "./WalletSummary";
@@ -28,6 +32,13 @@ interface WalletDashboardProps {
   onSavePerfil: (diaria: number, valorHora: number) => void;
   onLaunched: (entry: Entry) => void;
   onError: (msg: string | null) => void;
+  /** Tudo abaixo são os envelopes (mini caixas) do caixa aberto. */
+  summaries: Record<string, Totals>;
+  envelopes: WalletList[];
+  onCreateEnvelope: (name: string) => Promise<void>;
+  onDistribute: (input: { paraId: string; paraNome: string; amount: number }) => Promise<void>;
+  onOpenEnvelope: (id: string) => void;
+  onBackToCaixa?: (() => void) | undefined;
 }
 
 const RECENT_LIMIT = 5;
@@ -46,6 +57,12 @@ export function WalletDashboard({
   onSavePerfil,
   onLaunched,
   onError,
+  summaries,
+  envelopes,
+  onCreateEnvelope,
+  onDistribute,
+  onOpenEnvelope,
+  onBackToCaixa,
 }: WalletDashboardProps) {
   const [period, setPeriod] = useState<Period>("tudo");
   const [showStatement, setShowStatement] = useState(false);
@@ -61,6 +78,10 @@ export function WalletDashboard({
   const periodEntries = useMemo(() => filterByPeriod(entries, period), [entries, period]);
   const totals = useMemo(() => totalsOf(periodEntries), [periodEntries]);
   const recent = periodEntries.slice(0, RECENT_LIMIT);
+  const serie = useMemo(() => monthlySeries(entries), [entries]);
+  // Limite de distribuição é o saldo TODO do caixa, não o do período visível.
+  const saldoCaixa = useMemo(() => totalsOf(entries).balance, [entries]);
+  const pai = list.parentId ? lists.find((l) => l.id === list.parentId) : undefined;
 
   const commitRename = () => {
     const next = nameValue.trim();
@@ -129,6 +150,16 @@ export function WalletDashboard({
             </div>
           ) : (
             <div className="flex items-center gap-3">
+              {list.parentId && pai && onBackToCaixa ? (
+                <button
+                  type="button"
+                  onClick={onBackToCaixa}
+                  className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                >
+                  <ArrowLeft className="size-3.5" />
+                  {pai.name}
+                </button>
+              ) : null}
               <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight">
                 {list.name}
               </h1>
@@ -162,6 +193,21 @@ export function WalletDashboard({
                 period={period}
                 onPeriodChange={setPeriod}
               />
+
+              {/* Envelopes só existem dentro do caixa raiz. */}
+              {!list.parentId ? (
+                <EnvelopesCard
+                  caixa={list}
+                  caixaSaldo={saldoCaixa}
+                  envelopes={envelopes}
+                  summaries={summaries}
+                  onCreate={onCreateEnvelope}
+                  onDistribute={onDistribute}
+                  onOpen={onOpenEnvelope}
+                />
+              ) : null}
+
+              <FlowChart data={serie} listName={list.name} />
             </div>
 
             <div className="flex flex-col gap-4 lg:sticky lg:top-4">
@@ -169,6 +215,10 @@ export function WalletDashboard({
                 listName={list.name}
                 daily={daily}
                 hourRate={hourRate}
+                envelopes={envelopes}
+                summaries={summaries}
+                saldoLista={saldoCaixa}
+                isEnvelope={Boolean(list.parentId)}
                 onCreate={onCreate}
                 onSavePerfil={onSavePerfil}
                 onLaunched={onLaunched}
@@ -181,7 +231,8 @@ export function WalletDashboard({
                     Recentes
                   </h2>
                   <span className="text-[11px] text-muted-foreground">
-                    {periodEntries.length} lançamentos
+                    {periodEntries.length}{" "}
+                    {periodEntries.length === 1 ? "lançamento" : "lançamentos"}
                   </span>
                 </header>
 

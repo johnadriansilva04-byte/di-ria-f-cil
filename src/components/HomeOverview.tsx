@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { TrendingDown, TrendingUp, ArrowRight } from "lucide-react";
+import { Flame, TrendingDown, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
-import { brl, totalsOf, type Entry, type WalletList } from "@/lib/caixa";
-import { playTrophy } from "@/lib/sfx";
+import { brl, semTransferencias, totalsOf, type Entry, type WalletList } from "@/lib/caixa";
+import { streakOf } from "@/lib/streak";
+import { playGain, playTrophy } from "@/lib/sfx";
 import { useMetas } from "@/hooks/use-metas";
 import { useConquistas } from "@/hooks/use-conquistas";
+import { useCountUp } from "@/hooks/use-count-up";
 import { cn } from "@/lib/utils";
 import { FinancialHealth } from "./FinancialHealth";
 import { SmartInsights } from "./SmartInsights";
 import { CashFlow } from "./CashFlow";
+import { ExpenseCategories } from "./ExpenseCategories";
 import { FinancialGoals } from "./FinancialGoals";
+import { GoalCelebration } from "./GoalCelebration";
+import { HomeDonutChart } from "./HomeDonutChart";
 import { SalaDeTrofeus } from "./SalaDeTrofeus";
 
 interface HomeOverviewProps {
@@ -41,13 +46,24 @@ export function HomeOverview({
   onOpenSidebar,
   userId,
 }: HomeOverviewProps) {
-  const totals = useMemo(() => totalsOf(entries), [entries]);
+  // Movimentação interna (distribuição caixa → envelope) não conta como
+  // renda/gasto global: os pares se cancelam, então o saldo não muda.
+  const reais = useMemo(() => semTransferencias(entries), [entries]);
+  const totals = useMemo(() => totalsOf(reais), [reais]);
+  const saldoAnimado = useCountUp(totals.balance);
+  const sequencia = useMemo(() => streakOf(entries), [entries]);
   const { metas, loading: metasLoading, addMeta, deleteMeta, addToMeta } = useMetas(userId);
   const [novoTipo, setNovoTipo] = useState<string | null>(null);
+  const [metaCelebrada, setMetaCelebrada] = useState<string | null>(null);
+  const metasConcluidasRef = useRef<Set<string> | null>(null);
   const brilhoTimer = useRef<number | null>(null);
 
   // O troféu nasce do próprio hook: aqui só sobra avisar o usuário.
-  const { catalogo, loading: trofeusLoading, tabelaFaltando } = useConquistas(userId, metas, {
+  const {
+    catalogo,
+    loading: trofeusLoading,
+    tabelaFaltando,
+  } = useConquistas(userId, metas, {
     onDesbloqueio: (conquista) => {
       toast.success(`Troféu conquistado: ${conquista.titulo}`, {
         description: conquista.descricao,
@@ -56,6 +72,27 @@ export function HomeOverview({
       setNovoTipo(conquista.tipo);
     },
   });
+
+  // Celebra só o que acabou de ser concluído DURANTE a sessão:
+  // metas já batidas na chegada não disparam confete de novo.
+  useEffect(() => {
+    if (metasLoading) return;
+    const concluidas = new Set(
+      metas.filter((m) => m.concluida || m.valor_atual >= m.valor_alvo).map((m) => m.id),
+    );
+    const anteriores = metasConcluidasRef.current;
+    if (anteriores) {
+      for (const id of concluidas) {
+        if (anteriores.has(id)) continue;
+        const meta = metas.find((m) => m.id === id);
+        if (!meta) continue;
+        setMetaCelebrada(meta.nome);
+        toast.success(`Meta concluída: ${meta.nome}`, { description: "Fechou a meta! 🎯" });
+        playGain();
+      }
+    }
+    metasConcluidasRef.current = concluidas;
+  }, [metas, metasLoading]);
 
   // O brilho é só de estreia: some sozinho para o selo não ficar piscando.
   useEffect(() => {
@@ -92,23 +129,28 @@ export function HomeOverview({
                 }}
               />
               <div className="relative">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
-                  Saldo total
+                <p
+                  className={cn(
+                    "text-[10px] font-semibold uppercase tracking-widest",
+                    totals.balance < 0 ? "text-expense" : "text-muted-foreground/70",
+                  )}
+                >
+                  {totals.balance < 0 ? "Dívida global" : "Caixa global"}
                 </p>
                 <p
                   className={cn(
-                    "mt-3 font-[family-name:var(--font-display)] text-4xl font-bold tabular-nums tracking-tight sm:text-5xl lg:text-7xl",
+                    "mt-3 font-[family-name:var(--font-display)] text-4xl font-bold tabular-nums tracking-tight sm:text-5xl lg:text-6xl",
                     totals.balance < 0 ? "text-expense" : "text-foreground",
                   )}
                 >
-                  {brl(totals.balance)}
+                  {brl(saldoAnimado)}
                 </p>
-                <div className="mt-4 flex items-center gap-3 sm:gap-4">
+                <div className="mt-4 flex flex-wrap items-center gap-3 sm:gap-4">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="size-3.5 sm:size-4 text-income" />
                     <div>
                       <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                        Receitas
+                        Renda global
                       </p>
                       <p className="font-[family-name:var(--font-display)] text-xs sm:text-sm font-bold tabular-nums text-income">
                         {brl(totals.income)}
@@ -119,25 +161,40 @@ export function HomeOverview({
                     <TrendingDown className="size-3.5 sm:size-4 text-expense" />
                     <div>
                       <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                        Despesas
+                        Gastos global
                       </p>
                       <p className="font-[family-name:var(--font-display)] text-xs sm:text-sm font-bold tabular-nums text-expense">
                         {brl(totals.expense)}
                       </p>
                     </div>
                   </div>
+                  {sequencia > 0 ? (
+                    <div
+                      title="Dias seguidos lançando no caixa"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1"
+                    >
+                      <Flame className="size-3.5 text-chart-5" />
+                      <span className="text-[11px] font-semibold tabular-nums">
+                        {sequencia} {sequencia === 1 ? "dia seguido" : "dias seguidos"}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </section>
 
             {/* Premium Insights Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FinancialHealth entries={entries} lists={lists} />
-              <CashFlow entries={entries} />
+              <FinancialHealth entries={reais} lists={lists} />
+              <CashFlow entries={reais} />
             </div>
 
-            <SmartInsights entries={entries} lists={lists} />
+            <ExpenseCategories entries={reais} />
 
+            <SmartInsights entries={reais} lists={lists} />
+
+            {/* Metas e troféus lado a lado: metade da rolagem, mesma informação. */}
+            <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
               <FinancialGoals
                 currentBalance={totals.balance}
                 metas={metas}
@@ -153,64 +210,23 @@ export function HomeOverview({
                 tabelaFaltando={tabelaFaltando}
                 novoTipo={novoTipo}
               />
+            </div>
 
-            {/* Quick access to wallets */}
-            <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-[family-name:var(--font-display)] text-sm font-bold tracking-tight">
-                  Meus Caixas
-                </h2>
-                <span className="text-[11px] text-muted-foreground">{lists.length} {lists.length === 1 ? "caixa" : "caixas"}</span>
-              </div>
-
-              {lists.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 px-4 py-6 sm:px-5 sm:py-8 text-center">
-                  <p className="text-sm text-muted-foreground">Você ainda não tem caixas.</p>
-                  <button
-                    type="button"
-                    onClick={onOpenSidebar}
-                    className="mt-2 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition-transform active:scale-[0.98] lg:hidden"
-                  >
-                    Criar primeiro caixa
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {lists.map((list) => {
-                    const listEntries = entries.filter((e) => e.listaId === list.id);
-                    const listTotals = totalsOf(listEntries);
-
-                    return (
-                      <button
-                        key={list.id}
-                        type="button"
-                        onClick={() => onOpenList(list.id)}
-                        className="group flex flex-col items-start gap-2 p-3 sm:p-4 rounded-xl border border-border bg-secondary/30 hover:border-primary/40 hover:bg-secondary/50 transition-all active:scale-[0.98]"
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-xs sm:text-sm font-semibold truncate">{list.name}</span>
-                          <ArrowRight className="size-3.5 sm:size-4 text-muted-foreground/50 group-hover:text-primary transition-colors" />
-                        </div>
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-[9px] sm:text-[10px] text-muted-foreground">{listTotals.count} lançamentos</span>
-                          <span
-                            className={cn(
-                              "font-[family-name:var(--font-display)] text-xs sm:text-sm font-bold tabular-nums",
-                              listTotals.balance < 0 ? "text-expense" : listTotals.balance > 0 ? "text-income" : "text-muted-foreground",
-                            )}
-                          >
-                            {brl(listTotals.balance)}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
+            {/* Donut por caixa — a legenda já são os cards clicáveis: substitui
+                a antiga seção “Meus Caixas” sem duplicar informação. */}
+            <HomeDonutChart
+              lists={lists}
+              entries={entries}
+              onOpenList={onOpenList}
+              onOpenSidebar={onOpenSidebar}
+            />
           </div>
         )}
       </div>
+
+      {metaCelebrada ? (
+        <GoalCelebration name={metaCelebrada} onDone={() => setMetaCelebrada(null)} />
+      ) : null}
     </div>
   );
 }

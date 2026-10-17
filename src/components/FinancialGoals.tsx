@@ -154,7 +154,9 @@ export function FinancialGoals({
         <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 px-5 py-8 text-center">
           <Target className="size-8 text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">Sem metas definidas</p>
-          <p className="text-xs text-muted-foreground/60">Crie metas para acompanhar seus objetivos.</p>
+          <p className="text-xs text-muted-foreground/60">
+            Crie metas para acompanhar seus objetivos.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -228,7 +230,11 @@ export function FinancialGoals({
                           disabled={salvandoDeposito}
                           className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
                         >
-                          {salvandoDeposito ? <Loader2 className="size-3.5 animate-spin" /> : "Guardar"}
+                          {salvandoDeposito ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            "Guardar"
+                          )}
                         </button>
                         <button
                           type="button"

@@ -3,9 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   adoptLegacyEntries,
   clearLegacyLocalLists,
+  compactarLancamentos,
   createList,
   deleteEntry,
   deleteList,
+  distribuir as distribuirNoBanco,
   deleteMyAccount,
   errorMessage,
   fetchEntries,
@@ -35,6 +37,8 @@ export type NewEntry = {
   amount: number;
   detail?: string | undefined;
   date?: string | undefined;
+  /** Lista que recebe o lançamento (padrão: lista ativa). */
+  listaId?: string | undefined;
 };
 
 /** Listas antigas que só existiam no navegador entram no banco uma única vez. */
@@ -208,7 +212,7 @@ export function useCaixa(userId: string) {
       const entry = await mutate(() =>
         insertEntry({
           userId,
-          listaId: activeListId,
+          listaId: input.listaId ?? activeListId,
           label: input.label,
           kind: input.kind,
           amount: input.amount,
@@ -250,13 +254,46 @@ export function useCaixa(userId: string) {
   );
 
   const addList = useCallback(
-    async (name: string) => {
-      const created = await mutate(() => createList(userId, name));
+    async (name: string, parentId?: string) => {
+      const created = await mutate(() => createList(userId, name, undefined, parentId ?? null));
       setLists((prev) => [...prev, created]);
-      setActiveListIdState(created.id);
+      // Criar um envelope não tira você da tela do caixa que está vendo.
+      if (!parentId) setActiveListIdState(created.id);
       return created;
     },
     [userId, mutate],
+  );
+
+  /**
+   * Transfere do caixa para um envelope: saída no caixa + entrada no envelope
+   * (o par se cancela no total geral, sem inflar renda nem gastos globais).
+   */
+  const distribuir = useCallback(
+    async (input: {
+      deId: string;
+      deNome: string;
+      paraId: string;
+      paraNome: string;
+      amount: number;
+    }) => {
+      const par = await mutate(() => distribuirNoBanco({ userId, ...input }));
+      setEntries((prev) => [par.entrada, par.saida, ...prev]);
+      return par;
+    },
+    [userId, mutate],
+  );
+
+  /**
+   * Limpeza pesada: um único request no servidor compacta vários meses e
+   * depois a tela é carregada de novo com a tabela enxuta.
+   */
+  const otimizar = useCallback(
+    async (dias: number) => {
+      const meses = await mutate(() => compactarLancamentos(dias));
+      scheduleRefresh(0);
+      return meses;
+    },
+    [mutate, scheduleRefresh],
   );
 
   const editList = useCallback(
@@ -269,12 +306,18 @@ export function useCaixa(userId: string) {
 
   const removeList = useCallback(
     async (id: string) => {
-      const remaining = lists.filter((l) => l.id !== id);
-      await mutate(() => deleteList(id));
+      // Excluir um caixa leva os envelopes junto (com os lançamentos deles).
+      const filhas = lists.filter((l) => l.parentId === id);
+      const removidas = [id, ...filhas.map((l) => l.id)];
+      await mutate(async () => {
+        for (const filha of filhas) await deleteList(filha.id);
+        await deleteList(id);
+      });
+      const remaining = lists.filter((l) => !removidas.includes(l.id));
       setLists(remaining);
-      setEntries((prev) => prev.filter((e) => e.listaId !== id));
+      setEntries((prev) => prev.filter((e) => !e.listaId || !removidas.includes(e.listaId)));
       setActiveListIdState((current) => {
-        if (current && current !== id) return current;
+        if (current && !removidas.includes(current)) return current;
         return remaining[0]?.id ?? null;
       });
     },
@@ -303,10 +346,18 @@ export function useCaixa(userId: string) {
     await supabase.auth.signOut();
   }, []);
 
-  const activeList = useMemo(() => lists.find((l) => l.id === activeListId) ?? null, [lists, activeListId]);
+  const activeList = useMemo(
+    () => lists.find((l) => l.id === activeListId) ?? null,
+    [lists, activeListId],
+  );
   const activeEntries = useMemo(
     () => entries.filter((e) => e.listaId === activeListId),
     [entries, activeListId],
+  );
+  /** Mini caixas (envelopes) do caixa aberto agora. */
+  const envelopes = useMemo(
+    () => (activeListId ? lists.filter((l) => l.parentId === activeListId) : []),
+    [lists, activeListId],
   );
   const summaries: Record<string, Totals> = useMemo(() => totalsByList(entries), [entries]);
 
@@ -316,6 +367,7 @@ export function useCaixa(userId: string) {
     activeList,
     activeEntries,
     activeListId,
+    envelopes,
     summaries,
     perfil,
     loading,
@@ -329,6 +381,8 @@ export function useCaixa(userId: string) {
     addList,
     editList,
     removeList,
+    distribuir,
+    otimizar,
     updatePerfil,
     deleteAccount,
   };

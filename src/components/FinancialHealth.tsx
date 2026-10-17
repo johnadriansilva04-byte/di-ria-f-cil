@@ -49,7 +49,10 @@ export function FinancialHealth({ entries, lists }: FinancialHealthProps) {
       <div className="mb-4">
         <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
           <div
-            className={cn("h-full rounded-full transition-all duration-500", health.color.replace("text-", "bg-"))}
+            className={cn(
+              "h-full rounded-full transition-all duration-500",
+              health.color.replace("text-", "bg-"),
+            )}
             style={{ width: `${health.score}%` }}
           />
         </div>
@@ -58,10 +61,13 @@ export function FinancialHealth({ entries, lists }: FinancialHealthProps) {
 
       <div className="space-y-2">
         {health.factors.map((factor, index) => (
-          <div key={index} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+          <div
+            key={index}
+            className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
+          >
             <div className="flex items-center gap-2">
               {factor.status === "good" && <TrendingUp className="size-3.5 text-income" />}
-              {factor.status === "warning" && <AlertTriangle className="size-3.5 text-yellow-500" />}
+              {factor.status === "warning" && <AlertTriangle className="size-3.5 text-chart-5" />}
               {factor.status === "bad" && <TrendingDown className="size-3.5 text-expense" />}
               <span className="text-xs text-muted-foreground">{factor.name}</span>
             </div>
@@ -129,7 +135,7 @@ function calculateHealth(entries: Entry[], lists: { id: string; name: string }[]
     color = "text-primary";
   } else if (score >= 40) {
     label = "Atenção - Pode melhorar";
-    color = "text-yellow-500";
+    color = "text-chart-5";
   } else {
     label = "Crítica - Precisa de ação";
     color = "text-expense";

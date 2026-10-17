@@ -46,21 +46,31 @@ export type Database = {
           created_at: string;
           id: string;
           nome: string;
+          parent_id: string | null;
           user_id: string;
         };
         Insert: {
           created_at?: string;
           id?: string;
           nome: string;
+          parent_id?: string | null;
           user_id: string;
         };
         Update: {
           created_at?: string;
           id?: string;
           nome?: string;
+          parent_id?: string | null;
           user_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "listas_parent_id_fkey";
+            columns: ["parent_id"];
+            referencedRelation: "listas";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       lancamentos: {
         Row: {
@@ -163,6 +173,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      compactar_lancamentos: {
+        Args: { p_dias?: number };
+        Returns: number;
+      };
       excluir_minha_conta: {
         Args: Record<string, never>;
         Returns: undefined;

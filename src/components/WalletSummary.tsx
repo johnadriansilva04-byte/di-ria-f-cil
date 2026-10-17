@@ -1,5 +1,6 @@
 import { TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { brl, PERIODS, type Period, type Totals } from "@/lib/caixa";
+import { useCountUp } from "@/hooks/use-count-up";
 import { cn } from "@/lib/utils";
 
 interface WalletSummaryProps {
@@ -10,6 +11,8 @@ interface WalletSummaryProps {
 }
 
 export function WalletSummary({ listName, totals, period, onPeriodChange }: WalletSummaryProps) {
+  const saldoAnimado = useCountUp(totals.balance);
+
   return (
     <section className="space-y-4">
       {/* Period Selector - Simplified */}
@@ -57,7 +60,7 @@ export function WalletSummary({ listName, totals, period, onPeriodChange }: Wall
               totals.balance < 0 ? "text-expense" : "text-foreground",
             )}
           >
-            {brl(totals.balance)}
+            {brl(saldoAnimado)}
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
             {totals.count === 0

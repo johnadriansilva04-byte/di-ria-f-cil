@@ -28,6 +28,8 @@ export type WalletList = {
   id: string;
   name: string;
   createdAt: number;
+  /** null = caixa raiz; id de outra lista = envelope (mini caixa) dela. */
+  parentId: string | null;
 };
 
 export type Totals = {
@@ -226,6 +228,12 @@ export function monthlySeries(entries: Entry[], months = 6): MonthPoint[] {
 export const LISTS_MIGRATION_HINT =
   "O banco ainda não tem a tabela de listas. Rode o arquivo supabase/setup_completo.sql no SQL Editor do Supabase.";
 
+export const ENVELOPES_MIGRATION_HINT =
+  "O banco ainda não tem os envelopes (parent_id). Rode o arquivo supabase/05_envelopes.sql no SQL Editor do Supabase.";
+
+export const COMPACTAR_MIGRATION_HINT =
+  "O banco ainda não tem a função de compactação. Rode o arquivo supabase/06_compactar.sql no SQL Editor do Supabase.";
+
 export function isMissingListsTable(error: unknown): boolean {
   const err = error as { code?: string; message?: string } | null;
   if (!err) return false;
@@ -241,6 +249,9 @@ export function isMissingListsTable(error: unknown): boolean {
 export function errorMessage(error: unknown, fallback: string): string {
   if (isMissingListsTable(error)) return LISTS_MIGRATION_HINT;
   const message = error instanceof Error ? error.message : "";
+  if (message.includes("parent_id")) return ENVELOPES_MIGRATION_HINT;
+  if (message.includes("compactar_lancamentos") || message.includes("function public.compactar"))
+    return COMPACTAR_MIGRATION_HINT;
   if (message.includes("Failed to fetch") || message.includes("NetworkError")) {
     return "Sem conexão com o servidor. Confira sua internet e tente de novo.";
   }
@@ -249,32 +260,42 @@ export function errorMessage(error: unknown, fallback: string): string {
 
 // ── Listas (Supabase = fonte de verdade) ─────────────────────────────
 
-type ListRow = { id: string; nome: string; created_at: string };
+type ListRow = { id: string; nome: string; created_at: string; parent_id?: string | null };
 
 const toList = (r: ListRow): WalletList => ({
   id: r.id,
   name: r.nome,
   createdAt: new Date(r.created_at).getTime(),
+  parentId: r.parent_id ?? null,
 });
 
 export async function fetchLists(userId: string): Promise<WalletList[]> {
   const { data, error } = await supabase
     .from("listas")
-    .select("id, nome, created_at")
+    // select * de propósito: enquanto a coluna parent_id não existir no banco
+    // (05_envelopes.sql ainda não rodou), a leitura segue funcionando.
+    .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []).map((r) => toList(r as ListRow));
 }
 
-export async function createList(userId: string, name: string, id?: string): Promise<WalletList> {
-  const { data, error } = await supabase
-    .from("listas")
-    .insert(
-      id ? { id, user_id: userId, nome: name.trim() } : { user_id: userId, nome: name.trim() },
-    )
-    .select("id, nome, created_at")
-    .single();
+export async function createList(
+  userId: string,
+  name: string,
+  id?: string,
+  parentId?: string | null,
+): Promise<WalletList> {
+  const payload: {
+    user_id: string;
+    nome: string;
+    id?: string;
+    parent_id?: string | null;
+  } = { user_id: userId, nome: name.trim() };
+  if (id) payload.id = id;
+  if (parentId) payload.parent_id = parentId;
+  const { data, error } = await supabase.from("listas").insert(payload).select("*").single();
   if (error) throw error;
   return toList(data as ListRow);
 }
@@ -433,6 +454,81 @@ export async function deleteEntry(id: string): Promise<void> {
   const { data, error } = await supabase.from("lancamentos").delete().eq("id", id).select("id");
   if (error) throw error;
   if (!data || data.length === 0) throw new Error(NOTHING_CHANGED);
+}
+
+// ── Distribuição (caixa → envelope) ─────────────────────────────
+
+/** Marca nas pernas de uma distribuição, para separá-la de gasto de verdade. */
+export const MARCA_TRANSFERENCIA = "transferência";
+
+/** Distribuição é movimentação interna: não conta como receita/gasto global. */
+export const isTransferencia = (e: Entry) => (e.detail ?? "").includes(MARCA_TRANSFERENCIA);
+
+export const semTransferencias = (entries: Entry[]) => entries.filter((e) => !isTransferencia(e));
+
+export type DistribuicaoInput = {
+  userId: string;
+  deId: string;
+  deNome: string;
+  paraId: string;
+  paraNome: string;
+  amount: number;
+};
+
+/**
+ * Manda valor do caixa para um envelope: sai do caixa e entra no envelope.
+ * São dois lançamentos (o Supabase não dá transação daqui); se a perna de
+ * entrada falhar, a de volta é lançada para o dinheiro não sumir.
+ */
+export async function distribuir(
+  input: DistribuicaoInput,
+): Promise<{ saida: Entry; entrada: Entry }> {
+  const saida = await insertEntry({
+    userId: input.userId,
+    listaId: input.deId,
+    label: `Distribuído para ${input.paraNome}`,
+    kind: "saida",
+    amount: input.amount,
+    detail: `${MARCA_TRANSFERENCIA} de ${input.deNome}`,
+  });
+  try {
+    const entrada = await insertEntry({
+      userId: input.userId,
+      listaId: input.paraId,
+      label: "Recebido do caixa",
+      kind: "entrada",
+      amount: input.amount,
+      detail: `${MARCA_TRANSFERENCIA} do caixa ${input.deNome}`,
+    });
+    return { saida, entrada };
+  } catch (e) {
+    try {
+      await insertEntry({
+        userId: input.userId,
+        listaId: input.deId,
+        label: `Devolução de ${input.paraNome}`,
+        kind: "entrada",
+        amount: input.amount,
+        detail: `${MARCA_TRANSFERENCIA} (cancelada)`,
+      });
+    } catch {
+      /* segue e repara o erro original */
+    }
+    throw e;
+  }
+}
+
+// ── Compactação (enxugar lancamentos) ───────────────────────
+
+/**
+ * Compacta meses antigos no servidor: o mês inteiro vira no máximo 2 linhas
+ * de resumo e o bruto é apagado (RPC `compactar_lancamentos`, um único request).
+ * Devolve a quantidade de meses arquivados.
+ */
+export async function compactarLancamentos(dias: number): Promise<number> {
+  const { data, error } = await supabase.rpc("compactar_lancamentos", { p_dias: dias });
+  if (error) throw error;
+  return Number(data ?? 0);
 }
 
 // ── Conta do usuário ─────────────────────────────────────────────────

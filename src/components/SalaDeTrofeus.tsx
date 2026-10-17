@@ -13,13 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/caixa";
 import type { TrofeuNaSala } from "@/hooks/use-conquistas";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 
 const ICONES: Record<string, LucideIcon> = {
   trophy: Trophy,
@@ -49,12 +43,7 @@ interface SalaDeTrofeusProps {
  * Os troféus ficam em selos quadrados e só o escolhido abre a ficha, para a
  * seção não competir com os números do caixa na tela do celular.
  */
-export function SalaDeTrofeus({
-  catalogo,
-  loading,
-  tabelaFaltando,
-  novoTipo,
-}: SalaDeTrofeusProps) {
+export function SalaDeTrofeus({ catalogo, loading, tabelaFaltando, novoTipo }: SalaDeTrofeusProps) {
   const [aberto, setAberto] = useState<TrofeuNaSala | null>(null);
 
   const ganhos = catalogo.filter((t) => t.conquistada).length;

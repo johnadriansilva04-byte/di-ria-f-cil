@@ -155,9 +155,7 @@ export function useConquistas(
         if (!data) continue; // já existia: nada novo para anunciar
 
         const nova = data as Conquista;
-        setConquistas((prev) =>
-          prev.some((c) => c.tipo === nova.tipo) ? prev : [nova, ...prev],
-        );
+        setConquistas((prev) => (prev.some((c) => c.tipo === nova.tipo) ? prev : [nova, ...prev]));
         if (!silencioso) avisar(nova);
         else jaAvisados.current.add(nova.tipo);
       }

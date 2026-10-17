@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Home, LogOut, Menu, Pencil, Plus, Trash2, X } from "lucide-react";
-import { brl, brlCompact, type Totals, type WalletList } from "@/lib/caixa";
+import { Archive, Check, Home, LogOut, Menu, Pencil, Plus, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
+import { brl, brlCompact, errorMessage, type Totals, type WalletList } from "@/lib/caixa";
 import { BrandLockup } from "@/components/Brand";
 import { cn } from "@/lib/utils";
 
@@ -17,12 +18,17 @@ interface WalletSidebarProps {
   telefone?: string;
   onSignOut: () => void;
   onDeleteAccount: () => Promise<void>;
+  /** Compacta meses antigos no servidor; devolve quantos meses foram arquivados. */
+  onOtimizar: (dias: number) => Promise<number>;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }
 
 const inlineInput =
   "min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring/30";
+
+/** "1 lançamento" / "3 lançamentos" — texto amontoado com (s) quebra a leitura. */
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 export function WalletSidebar({
   lists,
@@ -37,6 +43,7 @@ export function WalletSidebar({
   telefone,
   onSignOut,
   onDeleteAccount,
+  onOtimizar,
   collapsed = false,
   onToggleCollapse,
 }: WalletSidebarProps) {
@@ -46,6 +53,9 @@ export function WalletSidebar({
   const [editName, setEditName] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmAccount, setConfirmAccount] = useState(false);
+  const [confirmOtimizar, setConfirmOtimizar] = useState(false);
+  const [otimizando, setOtimizando] = useState(false);
+  const [erroOtimizar, setErroOtimizar] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const newInputRef = useRef<HTMLInputElement>(null);
@@ -60,6 +70,9 @@ export function WalletSidebar({
   }, [editingId]);
 
   const totalGeral = lists.reduce((acc, list) => acc + (summaries[list.id]?.balance ?? 0), 0);
+  // Caixas raiz; os envelopes ficam aninhados embaixo do caixa pai.
+  const raizes = lists.filter((l) => !l.parentId);
+  const filhasDe = (id: string) => lists.filter((l) => l.parentId === id);
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -98,6 +111,24 @@ export function WalletSidebar({
       await onDelete(id);
       setConfirmDeleteId(null);
     });
+  };
+
+  /** Limpeza: soma os meses antigos em resumo e apaga o bruto (irreversível). */
+  const otimizar = (dias: number) => {
+    setErroOtimizar(null);
+    setOtimizando(true);
+    void onOtimizar(dias)
+      .then((meses) => {
+        setConfirmOtimizar(false);
+        toast.success(
+          meses > 0
+            ? `${meses} ${meses === 1 ? "mês arquivado" : "meses arquivados"}`
+            : "Nada antigo para arquivar ainda",
+          { description: "O resultado ficou salvo; os lançamentos brutos saíram da tabela." },
+        );
+      })
+      .catch((e: unknown) => setErroOtimizar(errorMessage(e, "Não foi possível otimizar agora.")))
+      .finally(() => setOtimizando(false));
   };
 
   if (collapsed) {
@@ -202,8 +233,9 @@ export function WalletSidebar({
           Minhas listas
         </p>
         <ul className="space-y-0.5">
-          {lists.map((list) => {
+          {raizes.map((list) => {
             const summary = summaries[list.id];
+            const filhas = filhasDe(list.id);
             return (
               <li key={list.id}>
                 {editingId === list.id ? (
@@ -238,7 +270,8 @@ export function WalletSidebar({
                 ) : confirmDeleteId === list.id ? (
                   <div className="rounded-lg bg-destructive/10 px-3 py-2">
                     <p className="text-xs text-destructive">
-                      Excluir “{list.name}” e seus {summary?.count ?? 0} lançamento(s)?
+                      Excluir “{list.name}” e{" "}
+                      {plural(summary?.count ?? 0, "lançamento", "lançamentos")}?
                     </p>
                     <div className="mt-1.5 flex items-center justify-end gap-1">
                       <button
@@ -293,7 +326,7 @@ export function WalletSidebar({
                         </span>
                       </span>
                       <span className="mt-0.5 block text-[10px] text-muted-foreground/50">
-                        {summary?.count ?? 0} lançamento(s)
+                        {plural(summary?.count ?? 0, "lançamento", "lançamentos")}
                       </span>
                     </button>
                     <div className="ml-1 hidden shrink-0 items-center gap-0.5 group-hover:flex focus-visible:flex">
@@ -319,6 +352,131 @@ export function WalletSidebar({
                     </div>
                   </div>
                 )}
+
+                {/* Mini caixas (envelopes) do caixa */}
+                {filhas.length > 0 ? (
+                  <ul className="ml-5 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2">
+                    {filhas.map((filha) => {
+                      const fsummary = summaries[filha.id];
+                      return (
+                        <li key={filha.id}>
+                          {editingId === filha.id ? (
+                            <div className="flex items-center gap-1 px-1">
+                              <input
+                                ref={editInputRef}
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleRename(filha.id);
+                                  if (e.key === "Escape") setEditingId(null);
+                                }}
+                                className={inlineInput}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRename(filha.id)}
+                                aria-label="Confirmar nome"
+                                className="shrink-0 rounded p-1 text-income transition-colors hover:bg-sidebar-accent"
+                              >
+                                <Check className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingId(null)}
+                                aria-label="Cancelar renomear"
+                                className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent"
+                              >
+                                <X className="size-3.5" />
+                              </button>
+                            </div>
+                          ) : confirmDeleteId === filha.id ? (
+                            <div className="rounded-lg bg-destructive/10 px-3 py-2">
+                              <p className="text-xs text-destructive">
+                                Excluir “{filha.name}” e{" "}
+                                {plural(fsummary?.count ?? 0, "lançamento", "lançamentos")}?
+                              </p>
+                              <div className="mt-1.5 flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(filha.id)}
+                                  disabled={busy}
+                                  className="rounded bg-destructive px-2 py-1 text-[11px] font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+                                >
+                                  Excluir
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteId(null)}
+                                  className="rounded px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="group flex items-center">
+                              <button
+                                type="button"
+                                onClick={() => onSelectList(filha.id)}
+                                aria-label={`Abrir ${filha.name}`}
+                                className={cn(
+                                  "min-w-0 flex-1 rounded-md px-2 py-1.5 text-left transition-colors",
+                                  activeListId === filha.id
+                                    ? "bg-sidebar-primary/15 text-sidebar-primary"
+                                    : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                                )}
+                              >
+                                <span className="flex items-center justify-between gap-2">
+                                  <span
+                                    className={cn(
+                                      "truncate text-[13px]",
+                                      activeListId === filha.id ? "font-semibold" : "font-medium",
+                                    )}
+                                  >
+                                    {filha.name}
+                                  </span>
+                                  <span
+                                    className={cn(
+                                      "shrink-0 font-[family-name:var(--font-display)] text-[10px] font-bold tabular-nums",
+                                      !fsummary || fsummary.count === 0
+                                        ? "text-muted-foreground/40"
+                                        : fsummary.balance < 0
+                                          ? "text-expense"
+                                          : "text-income",
+                                    )}
+                                  >
+                                    {brlCompact(fsummary?.balance ?? 0)}
+                                  </span>
+                                </span>
+                              </button>
+                              <div className="ml-1 hidden shrink-0 items-center gap-0.5 group-hover:flex focus-visible:flex">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingId(filha.id);
+                                    setEditName(filha.name);
+                                  }}
+                                  aria-label={`Renomear ${filha.name}`}
+                                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+                                >
+                                  <Pencil className="size-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteId(filha.id)}
+                                  aria-label={`Excluir ${filha.name}`}
+                                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-destructive"
+                                >
+                                  <Trash2 className="size-3" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
               </li>
             );
           })}
@@ -377,8 +535,13 @@ export function WalletSidebar({
 
       {/* Total geral */}
       <div className="border-t border-sidebar-border px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-          Total geral
+        <p
+          className={cn(
+            "text-[10px] font-semibold uppercase tracking-widest",
+            totalGeral < 0 ? "text-expense" : "text-muted-foreground/60",
+          )}
+        >
+          {totalGeral < 0 ? "Dívida total" : "Total geral"}
         </p>
         <p
           className={cn(
@@ -389,8 +552,60 @@ export function WalletSidebar({
           {brl(totalGeral)}
         </p>
         <p className="text-[10px] text-muted-foreground/50">
-          soma de todas as {lists.length} lista(s)
+          soma de {plural(raizes.length, "caixa", "caixas")} +{" "}
+          {plural(lists.length - raizes.length, "envelope", "envelopes")}
         </p>
+      </div>
+
+      {/* Limpeza de dados antigos */}
+      <div className="border-t border-sidebar-border px-3 py-2.5">
+        {confirmOtimizar ? (
+          <div className="rounded-lg bg-sidebar-accent/70 px-2.5 py-2">
+            <p className="text-[11px] leading-snug text-sidebar-foreground/80">
+              Arquiva os meses antes do período em <strong>2 linhas por mês</strong> e apaga os
+              lançamentos brutos. Saldo e totais continuam iguais — mas não dá pra desfazer.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {[90, 180, 365].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => otimizar(d)}
+                  disabled={otimizando}
+                  className="rounded-md bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                >
+                  {d === 90 ? "3 meses" : d === 180 ? "6 meses" : "12 meses"}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmOtimizar(false);
+                  setErroOtimizar(null);
+                }}
+                disabled={otimizando}
+                className="rounded-md px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmOtimizar(true);
+              setErroOtimizar(null);
+            }}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+          >
+            <Archive className="size-3.5" />
+            Otimizar dados antigos
+          </button>
+        )}
+        {erroOtimizar ? (
+          <p className="mt-1.5 text-[11px] font-medium text-destructive">{erroOtimizar}</p>
+        ) : null}
       </div>
 
       {/* Conta */}

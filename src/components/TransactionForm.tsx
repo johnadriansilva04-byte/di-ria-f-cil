@@ -8,7 +8,17 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { brl, errorMessage, today, toNumber, type Entry, type Kind } from "@/lib/caixa";
+import {
+  brl,
+  brlCompact,
+  errorMessage,
+  today,
+  toNumber,
+  type Entry,
+  type Kind,
+  type Totals,
+  type WalletList,
+} from "@/lib/caixa";
 import type { NewEntry } from "@/hooks/use-caixa";
 import { primeAudio } from "@/lib/sfx";
 import { cn } from "@/lib/utils";
@@ -17,6 +27,13 @@ interface TransactionFormProps {
   listName: string;
   daily: string;
   hourRate: string;
+  /** Envelopes do caixa ativo: origem opcional dos gastos. */
+  envelopes: WalletList[];
+  summaries: Record<string, Totals>;
+  /** Saldo cheio da lista que recebe (caixa raiz ou o envelope aberto). */
+  saldoLista: number;
+  /** true quando o formulário está dentro de um envelope. */
+  isEnvelope: boolean;
   onCreate: (input: NewEntry) => Promise<Entry>;
   onSavePerfil: (diaria: number, valorHora: number) => void;
   onLaunched: (entry: Entry) => void;
@@ -37,12 +54,17 @@ export function TransactionForm({
   listName,
   daily,
   hourRate,
+  envelopes,
+  summaries,
+  saldoLista,
+  isEnvelope,
   onCreate,
   onSavePerfil,
   onLaunched,
   onError,
 }: TransactionFormProps) {
   const [kind, setKind] = useState<Kind>("entrada");
+  const [origemId, setOrigemId] = useState("");
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today());
@@ -60,11 +82,27 @@ export function TransactionForm({
   }, [daily, kind, touched]);
 
   const extras = useMemo(() => toNumber(hours) * toNumber(hourRateLocal), [hours, hourRateLocal]);
-  const extrasTotal = toNumber(dailyLocal) + extras;
+  const extrasTotal = toNumber(dailyLocal) + extras; // Origem do gasto: no caixa raiz, escolher de qual envelope ele sai.
+  const mostrarOrigem = kind === "saida" && envelopes.length > 0;
+  const origem =
+    mostrarOrigem && origemId ? (envelopes.find((e) => e.id === origemId) ?? null) : null;
+
+  // Gasto sem ter: NÃO bloqueia — avisa que entra como dívida (fica negativo).
+  const saldoDestino = origem ? (summaries[origem.id]?.balance ?? 0) : saldoLista;
+  const falta = kind === "saida" ? toNumber(amount) - saldoDestino : 0;
+  const avisoDivida = falta > 0;
+  const textoDivida = origem
+    ? saldoLista >= falta
+      ? `Reserva estourada: faltou ${brl(falta)}. O caixa ainda tem ${brl(saldoLista)} — use “Distribuir” pra cobrir.`
+      : `Sem reserva e sem saldo no caixa: ${brl(falta)} fica como dívida.`
+    : isEnvelope
+      ? `Este envelope está ${brl(falta)} negativo (sem reserva).`
+      : `Sem saldo no caixa: ${brl(falta)} entra como dívida.`;
 
   const switchKind = (next: Kind) => {
     setKind(next);
     setShowExtras(false);
+    setOrigemId("");
     if (!touched) setAmount(next === "entrada" ? daily : "");
   };
 
@@ -97,6 +135,7 @@ export function TransactionForm({
         amount: value,
         detail: kind === "entrada" ? detail : undefined,
         date: date || today(),
+        listaId: origem ? origem.id : undefined,
       });
       onLaunched(entry);
       setLabel("");
@@ -165,6 +204,12 @@ export function TransactionForm({
                 setDetail(undefined);
               }}
               onFocus={(e) => e.currentTarget.select()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void submit();
+                }
+              }}
               inputMode="decimal"
               placeholder="0,00"
               aria-label="Valor"
@@ -202,6 +247,51 @@ export function TransactionForm({
           ))}
         </div>
 
+        {mostrarOrigem ? (
+          <div>
+            <span className={labelClass}>De onde sai?</span>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setOrigemId("")}
+                aria-pressed={origemId === ""}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
+                  origemId === ""
+                    ? "border-primary/50 bg-primary/15 font-semibold text-primary"
+                    : "border-border bg-secondary/60 text-muted-foreground hover:border-primary/40",
+                )}
+              >
+                Caixa geral
+              </button>
+              {envelopes.map((env) => {
+                const saldo = summaries[env.id]?.balance ?? 0;
+                return (
+                  <button
+                    key={env.id}
+                    type="button"
+                    onClick={() => setOrigemId(env.id)}
+                    aria-pressed={origemId === env.id}
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
+                      origemId === env.id
+                        ? "border-primary/50 bg-primary/15 font-semibold text-primary"
+                        : "border-border bg-secondary/60 text-muted-foreground hover:border-primary/40",
+                    )}
+                  >
+                    {env.name} · {brlCompact(saldo)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Avisa mas nunca bloqueia: lançar sem ter entra como dívida. */}
+        {avisoDivida ? (
+          <p className="text-[11px] font-medium leading-snug text-expense">{textoDivida}</p>
+        ) : null}
+
         <div className="flex items-center justify-between">
           <button
             type="button"
@@ -219,8 +309,8 @@ export function TransactionForm({
             type="date"
             value={date}
             max={today()}
-            onChange={(e) => setDate(e.value)}
-            className={inputClass}
+            onChange={(e) => setDate(e.target.value)}
+            className={cn(inputClass, "tabular-nums")}
           />
         )}
 

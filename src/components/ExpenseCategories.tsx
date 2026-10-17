@@ -29,11 +29,14 @@ export function ExpenseCategories({ entries, period = "mes" }: ExpenseCategories
 
   const categories = useMemo(() => {
     const expenses = periodEntries.filter((e) => e.kind === "saida");
-    const grouped = expenses.reduce((acc, e) => {
-      const key = e.label.toLowerCase();
-      acc[key] = (acc[key] || 0) + e.amount;
-      return acc;
-    }, {} as Record<string, number>);
+    const grouped = expenses.reduce(
+      (acc, e) => {
+        const key = e.label.toLowerCase();
+        acc[key] = (acc[key] || 0) + e.amount;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     return Object.entries(grouped)
       .map(([name, value]) => ({
@@ -126,7 +129,9 @@ export function ExpenseCategories({ entries, period = "mes" }: ExpenseCategories
               </div>
               <div className="text-right">
                 <p className="text-xs font-medium tabular-nums">{brlCompact(category.value)}</p>
-                <p className="text-[10px] text-muted-foreground">{category.percentage.toFixed(1)}%</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {category.percentage.toFixed(1)}%
+                </p>
               </div>
             </div>
           ))}

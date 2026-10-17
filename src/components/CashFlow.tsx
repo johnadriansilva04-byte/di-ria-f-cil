@@ -12,8 +12,12 @@ export function CashFlow({ entries, period = "mes" }: CashFlowProps) {
   const periodEntries = useMemo(() => filterByPeriod(entries, period), [entries, period]);
 
   const flow = useMemo(() => {
-    const income = periodEntries.filter((e) => e.kind === "entrada").reduce((sum, e) => sum + e.amount, 0);
-    const expense = periodEntries.filter((e) => e.kind === "saida").reduce((sum, e) => sum + e.amount, 0);
+    const income = periodEntries
+      .filter((e) => e.kind === "entrada")
+      .reduce((sum, e) => sum + e.amount, 0);
+    const expense = periodEntries
+      .filter((e) => e.kind === "saida")
+      .reduce((sum, e) => sum + e.amount, 0);
     const net = income - expense;
     const flowRate = income > 0 ? (net / income) * 100 : 0;
 
@@ -67,7 +71,9 @@ export function CashFlow({ entries, period = "mes" }: CashFlowProps) {
 
         <div className="rounded-xl border border-border/50 bg-secondary/30 p-2.5 sm:p-3">
           <div className="mb-1.5 flex items-center gap-1.5">
-            <TrendingUp className={cn("size-3.5 shrink-0", flow.net >= 0 ? "text-income" : "text-expense")} />
+            <TrendingUp
+              className={cn("size-3.5 shrink-0", flow.net >= 0 ? "text-income" : "text-expense")}
+            />
             <span className="truncate text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
               Sobrou
             </span>
@@ -90,7 +96,11 @@ export function CashFlow({ entries, period = "mes" }: CashFlowProps) {
             <div
               className={cn(
                 "h-full rounded-full transition-all duration-500",
-                flow.flowRate >= 20 ? "bg-income" : flow.flowRate >= 0 ? "bg-yellow-500" : "bg-expense",
+                flow.flowRate >= 20
+                  ? "bg-income"
+                  : flow.flowRate >= 0
+                    ? "bg-chart-5"
+                    : "bg-expense",
               )}
               style={{ width: `${Math.min(Math.abs(flow.flowRate), 100)}%` }}
             />
@@ -98,7 +108,11 @@ export function CashFlow({ entries, period = "mes" }: CashFlowProps) {
           <span
             className={cn(
               "text-xs font-bold tabular-nums",
-              flow.flowRate >= 20 ? "text-income" : flow.flowRate >= 0 ? "text-yellow-500" : "text-expense",
+              flow.flowRate >= 20
+                ? "text-income"
+                : flow.flowRate >= 0
+                  ? "text-chart-5"
+                  : "text-expense",
             )}
           >
             {flow.flowRate.toFixed(1)}%
