@@ -22,6 +22,23 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Variáveis de ambiente
+#
+# O .env versionado deste projeto carrega APENAS a chave publishable do Supabase
+# (pública por design, vai embutida no bundle do browser). Ele precisa continuar
+# no git porque é assim que o Lovable/Vercel recebe as chaves no build.
+#
+# Blindagem: qualquer arquivo .env que NÃO seja o principal é ignorado, então um
+# .env.local / .env.production com segredo de verdade nunca é commitado por engano.
+.env.*
+!.env.example
+
+# Segredos avulsos que jamais devem entrar no repositório
+*.pem
+*.key
+sb_secret_*
+*service_role*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
