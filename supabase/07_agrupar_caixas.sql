@@ -5,13 +5,15 @@
 -- independente (Minha Dívida, Pizzaria SH, Gasolina e óleo, Bobagens, Dívida R).
 -- Na verdade todos são UMA única contabilidade.
 --
--- Correção: as listas soltas viram ENVELOPES (parent_id) de um único caixa
--- principal. Nenhum lançamento, saldo, data ou descrição é tocado — só o
--- relacionamento entre as listas muda.
+-- Correção: TODAS as listas raiz daquele usuário viram ENVELOPES (parent_id) de
+-- um único caixa principal ("Minha Dívida"). Depois disso, criar outra
+-- contabilidade independente é usar "Nova lista" — que cria uma nova raiz.
+-- Nenhum lançamento, saldo, data ou descrição é tocado: só o relacionamento
+-- entre as listas muda.
 --
 -- Seguro por construção:
---   * só mexe em usuários que TÊM uma lista chamada "Minha Dívida" (a raiz
---     preferida); os demais usuários ficam intocados;
+--   * só mexe em usuários que TÊM uma lista chamada "Minha Dívida" (o caixa
+--     central); os demais usuários ficam intocados;
 --   * envelopes que já existem (parent_id preenchido) não são movidos;
 --   * idempotente: rodar de novo não muda nada;
 --   * reversível: o parent_id anterior fica salvo em listas_parent_backup.
@@ -43,10 +45,9 @@ select l.id, l.parent_id
 on conflict (lista_id) do nothing;
 
 -- 3) Agrupamento: para cada usuário que tenha um caixa "Minha Dívida", esse
---    caixa é a raiz e os envelopes nomeados abaixo passam a pertencer a ele.
+--    caixa é a raiz e TODAS as demais listas raiz viram envelopes dele.
 --    A comparação ignora acento/caixa ("Minha Divida" == "Minha Dívida").
---    Listas raiz que NÃO estão na lista (ex.: caixas criados pelo usuário)
---    ficam intocadas — continuam sendo caixas principais independentes.
+--    Usuários sem uma lista “Minha Dívida” ficam totalmente intocados.
 do $$
 declare
   v_afetadas integer;
@@ -61,9 +62,7 @@ begin
     ) as raiz
    where l.user_id = raiz.user_id
      and l.parent_id is null
-     and l.id <> raiz.id
-     and translate(lower(l.nome), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')
-         in ('pizzaria sh', 'gasolina e oleo', 'bobagens', 'divida r');
+     and l.id <> raiz.id;
 
   get diagnostics v_afetadas = row_count;
   raise notice 'Listas agrupadas como envelopes: %', v_afetadas;

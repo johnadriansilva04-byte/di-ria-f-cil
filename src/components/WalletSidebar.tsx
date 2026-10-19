@@ -1,5 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { Archive, Check, Home, LogOut, Menu, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+  Archive,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Home,
+  LogOut,
+  Menu,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { brl, brlCompact, errorMessage, type Totals, type WalletList } from "@/lib/caixa";
 import { BrandLockup } from "@/components/Brand";
@@ -57,6 +69,9 @@ export function WalletSidebar({
   const [otimizando, setOtimizando] = useState(false);
   const [erroOtimizar, setErroOtimizar] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Expansao explicita do usuario; sem toggle, o padrao e derivado (abre o
+  // caixa que contem a lista ativa) — assim nao depende de efeito/re-render.
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const newInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -75,6 +90,8 @@ export function WalletSidebar({
   // O saldo do caixa raiz já é o CONSOLIDADO (caixa + envelopes), então o
   // total geral soma só as raízes — somar os envelopes aqui contaria duas vezes.
   const totalGeral = raizes.reduce((acc, list) => acc + (summaries[list.id]?.balance ?? 0), 0);
+
+  const abertoDe = (id: string, contemAtiva: boolean) => toggled[id] ?? contemAtiva;
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -234,10 +251,13 @@ export function WalletSidebar({
         <p className="mb-2 mt-3 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
           Minhas listas
         </p>
-        <ul className="space-y-0.5">
+        <ul className="space-y-1">
           {raizes.map((list) => {
             const summary = summaries[list.id];
             const filhas = filhasDe(list.id);
+            const ativoNaFamilia =
+              activeListId === list.id || filhas.some((f) => f.id === activeListId);
+            const aberto = abertoDe(list.id, ativoNaFamilia);
             return (
               <li key={list.id}>
                 {editingId === list.id ? (
@@ -275,6 +295,12 @@ export function WalletSidebar({
                       Excluir “{list.name}” e{" "}
                       {plural(summary?.count ?? 0, "lançamento", "lançamentos")}?
                     </p>
+                    {filhas.length > 0 ? (
+                      <p className="mt-1 text-[11px] font-semibold text-destructive">
+                        Apaga também {plural(filhas.length, "sublista", "sublistas")}:{" "}
+                        {filhas.map((f) => f.name).join(", ")}
+                      </p>
+                    ) : null}
                     <div className="mt-1.5 flex items-center justify-end gap-1">
                       <button
                         type="button"
@@ -294,15 +320,20 @@ export function WalletSidebar({
                     </div>
                   </div>
                 ) : (
-                  <div className="group flex items-center">
+                  <div
+                    className={cn(
+                      "group flex items-center rounded-lg transition-colors",
+                      ativoNaFamilia ? "bg-sidebar-primary/15" : "hover:bg-sidebar-accent",
+                    )}
+                  >
                     <button
                       type="button"
                       onClick={() => onSelectList(list.id)}
                       className={cn(
                         "min-w-0 flex-1 rounded-lg px-3 py-2 text-left transition-colors",
                         activeListId === list.id
-                          ? "bg-sidebar-primary/15 text-sidebar-primary"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                          ? "text-sidebar-primary"
+                          : "text-sidebar-foreground/75 hover:text-sidebar-foreground",
                       )}
                     >
                       <span className="flex items-center justify-between gap-2">
@@ -316,7 +347,7 @@ export function WalletSidebar({
                         </span>
                         <span
                           className={cn(
-                            "shrink-0 font-[family-name:var(--font-display)] text-[11px] font-bold tabular-nums",
+                            "shrink-0 font-[family-name:var(--font-display)] text-xs font-bold tabular-nums",
                             !summary || summary.count === 0
                               ? "text-muted-foreground/40"
                               : summary.balance < 0
@@ -331,7 +362,7 @@ export function WalletSidebar({
                         {plural(summary?.count ?? 0, "lançamento", "lançamentos")}
                       </span>
                     </button>
-                    <div className="ml-1 hidden shrink-0 items-center gap-0.5 group-hover:flex focus-visible:flex">
+                    <div className="ml-0.5 flex shrink-0 items-center gap-0.5 pr-1">
                       <button
                         type="button"
                         onClick={() => {
@@ -339,7 +370,7 @@ export function WalletSidebar({
                           setEditName(list.name);
                         }}
                         aria-label={`Renomear ${list.name}`}
-                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+                        className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-foreground lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
                       >
                         <Pencil className="size-3" />
                       </button>
@@ -347,7 +378,7 @@ export function WalletSidebar({
                         type="button"
                         onClick={() => setConfirmDeleteId(list.id)}
                         aria-label={`Excluir ${list.name}`}
-                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-destructive"
+                        className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-destructive lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
                       >
                         <Trash2 className="size-3" />
                       </button>
@@ -355,129 +386,159 @@ export function WalletSidebar({
                   </div>
                 )}
 
-                {/* Mini caixas (envelopes) do caixa */}
+                {/* Sublistas (envelopes) do caixa */}
                 {filhas.length > 0 ? (
-                  <ul className="ml-5 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2">
-                    {filhas.map((filha) => {
-                      const fsummary = summaries[filha.id];
-                      return (
-                        <li key={filha.id}>
-                          {editingId === filha.id ? (
-                            <div className="flex items-center gap-1 px-1">
-                              <input
-                                ref={editInputRef}
-                                value={editName}
-                                onChange={(e) => setEditName(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleRename(filha.id);
-                                  if (e.key === "Escape") setEditingId(null);
-                                }}
-                                className={inlineInput}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleRename(filha.id)}
-                                aria-label="Confirmar nome"
-                                className="shrink-0 rounded p-1 text-income transition-colors hover:bg-sidebar-accent"
-                              >
-                                <Check className="size-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingId(null)}
-                                aria-label="Cancelar renomear"
-                                className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent"
-                              >
-                                <X className="size-3.5" />
-                              </button>
-                            </div>
-                          ) : confirmDeleteId === filha.id ? (
-                            <div className="rounded-lg bg-destructive/10 px-3 py-2">
-                              <p className="text-xs text-destructive">
-                                Excluir “{filha.name}” e{" "}
-                                {plural(fsummary?.count ?? 0, "lançamento", "lançamentos")}?
-                              </p>
-                              <div className="mt-1.5 flex items-center justify-end gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDelete(filha.id)}
-                                  disabled={busy}
-                                  className="rounded bg-destructive px-2 py-1 text-[11px] font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setToggled((prev) => ({ ...prev, [list.id]: !aberto }))}
+                      aria-expanded={aberto}
+                      aria-label={aberto ? `Recolher ${list.name}` : `Expandir ${list.name}`}
+                      className="ml-1 mt-0.5 flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    >
+                      {aberto ? (
+                        <ChevronDown className="size-3" />
+                      ) : (
+                        <ChevronRight className="size-3" />
+                      )}
+                      {plural(filhas.length, "sublista", "sublistas")}
+                    </button>
+                    {aberto ? (
+                      <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2">
+                        {filhas.map((filha) => {
+                          const fsummary = summaries[filha.id];
+                          return (
+                            <li key={filha.id}>
+                              {editingId === filha.id ? (
+                                <div className="flex items-center gap-1 px-1">
+                                  <input
+                                    ref={editInputRef}
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") handleRename(filha.id);
+                                      if (e.key === "Escape") setEditingId(null);
+                                    }}
+                                    className={inlineInput}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRename(filha.id)}
+                                    aria-label="Confirmar nome"
+                                    className="shrink-0 rounded p-1 text-income transition-colors hover:bg-sidebar-accent"
+                                  >
+                                    <Check className="size-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingId(null)}
+                                    aria-label="Cancelar renomear"
+                                    className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent"
+                                  >
+                                    <X className="size-3.5" />
+                                  </button>
+                                </div>
+                              ) : confirmDeleteId === filha.id ? (
+                                <div className="rounded-lg bg-destructive/10 px-3 py-2">
+                                  <p className="text-xs text-destructive">
+                                    Excluir “{filha.name}” e{" "}
+                                    {plural(fsummary?.count ?? 0, "lançamento", "lançamentos")}?
+                                  </p>
+                                  <div className="mt-1.5 flex items-center justify-end gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDelete(filha.id)}
+                                      disabled={busy}
+                                      className="rounded bg-destructive px-2 py-1 text-[11px] font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+                                    >
+                                      Excluir
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmDeleteId(null)}
+                                      className="rounded px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div
+                                  className={cn(
+                                    "group flex items-center rounded-md transition-colors",
+                                    activeListId === filha.id
+                                      ? "bg-sidebar-primary/15"
+                                      : "hover:bg-sidebar-accent",
+                                  )}
                                 >
-                                  Excluir
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmDeleteId(null)}
-                                  className="rounded px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
-                                >
-                                  Cancelar
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="group flex items-center">
-                              <button
-                                type="button"
-                                onClick={() => onSelectList(filha.id)}
-                                aria-label={`Abrir ${filha.name}`}
-                                className={cn(
-                                  "min-w-0 flex-1 rounded-md px-2 py-1.5 text-left transition-colors",
-                                  activeListId === filha.id
-                                    ? "bg-sidebar-primary/15 text-sidebar-primary"
-                                    : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                                )}
-                              >
-                                <span className="flex items-center justify-between gap-2">
-                                  <span
+                                  <button
+                                    type="button"
+                                    onClick={() => onSelectList(filha.id)}
+                                    aria-label={`Abrir ${filha.name}`}
                                     className={cn(
-                                      "truncate text-[13px]",
-                                      activeListId === filha.id ? "font-semibold" : "font-medium",
+                                      "min-w-0 flex-1 rounded-md px-2 py-1.5 text-left transition-colors",
+                                      activeListId === filha.id
+                                        ? "text-sidebar-primary"
+                                        : "text-sidebar-foreground/65 hover:text-sidebar-foreground",
                                     )}
                                   >
-                                    {filha.name}
-                                  </span>
-                                  <span
-                                    className={cn(
-                                      "shrink-0 font-[family-name:var(--font-display)] text-[10px] font-bold tabular-nums",
-                                      !fsummary || fsummary.count === 0
-                                        ? "text-muted-foreground/40"
-                                        : fsummary.balance < 0
-                                          ? "text-expense"
-                                          : "text-income",
-                                    )}
-                                  >
-                                    {brlCompact(fsummary?.balance ?? 0)}
-                                  </span>
-                                </span>
-                              </button>
-                              <div className="ml-1 hidden shrink-0 items-center gap-0.5 group-hover:flex focus-visible:flex">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingId(filha.id);
-                                    setEditName(filha.name);
-                                  }}
-                                  aria-label={`Renomear ${filha.name}`}
-                                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
-                                >
-                                  <Pencil className="size-3" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmDeleteId(filha.id)}
-                                  aria-label={`Excluir ${filha.name}`}
-                                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-destructive"
-                                >
-                                  <Trash2 className="size-3" />
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                                    <span className="flex items-center justify-between gap-2">
+                                      <span
+                                        className={cn(
+                                          "truncate text-[13px]",
+                                          activeListId === filha.id
+                                            ? "font-semibold"
+                                            : "font-medium",
+                                        )}
+                                      >
+                                        {filha.name}
+                                      </span>
+                                      <span
+                                        className={cn(
+                                          "shrink-0 font-[family-name:var(--font-display)] text-[11px] font-bold tabular-nums",
+                                          !fsummary || fsummary.count === 0
+                                            ? "text-muted-foreground/40"
+                                            : fsummary.balance < 0
+                                              ? "text-expense"
+                                              : "text-income",
+                                        )}
+                                      >
+                                        {brlCompact(fsummary?.balance ?? 0)}
+                                      </span>
+                                    </span>
+                                    <span className="mt-0.5 block text-[10px] text-muted-foreground/50">
+                                      {plural(fsummary?.count ?? 0, "lançamento", "lançamentos")}
+                                    </span>
+                                  </button>
+                                  <div className="ml-0.5 flex shrink-0 items-center gap-0.5 pr-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingId(filha.id);
+                                        setEditName(filha.name);
+                                      }}
+                                      aria-label={`Renomear ${filha.name}`}
+                                      className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-foreground lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
+                                    >
+                                      <Pencil className="size-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmDeleteId(filha.id)}
+                                      aria-label={`Excluir ${filha.name}`}
+                                      className="rounded p-1 text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-destructive lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
+                                    >
+                                      <Trash2 className="size-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+                  </div>
                 ) : null}
               </li>
             );
