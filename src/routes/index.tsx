@@ -290,6 +290,9 @@ function Dashboard({ session }: { session: Session }) {
             await caixa.addList(name);
             setView("lista");
           }}
+          onCreateEnvelope={async (parentId, name) => {
+            await caixa.addList(name, parentId);
+          }}
           onRename={caixa.editList}
           onDelete={caixa.removeList}
           telefone={telefone}
@@ -319,6 +322,9 @@ function Dashboard({ session }: { session: Session }) {
               onCreate={async (name) => {
                 await caixa.addList(name);
                 setView("lista");
+              }}
+              onCreateEnvelope={async (parentId, name) => {
+                await caixa.addList(name, parentId);
               }}
               onRename={caixa.editList}
               onDelete={caixa.removeList}
