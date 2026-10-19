@@ -3,7 +3,6 @@ import { ArrowLeft, Check, FileText, Pencil, X } from "lucide-react";
 import {
   filterByPeriod,
   monthlySeries,
-  semTransferencias,
   totalsOf,
   type Entry,
   type EntryPatch,
@@ -93,9 +92,11 @@ export function WalletDashboard({
   const totals = useMemo(() => totalsOf(periodEntries), [periodEntries]);
   const recent = periodEntries.slice(0, RECENT_LIMIT);
   const serie = useMemo(() => monthlySeries(resumoEntries), [resumoEntries]);
-  // Limite de distribuição é o saldo LIVRE do caixa (sem os envelopes), não o
-  // consolidado: só dá para separar o que ainda está no caixa.
-  const saldoCaixa = useMemo(() => totalsOf(semTransferencias(entries)).balance, [entries]);
+  // Limite de distribuição é o saldo LIVRE do caixa, não o consolidado: só dá
+  // para separar o que ainda está nele. Como `entries` são os lançamentos da
+  // própria lista, o saldo já desconta o que saiu numa distribuição — filtrar
+  // `transferência` aqui devolveria o dinheiro que já foi para os envelopes.
+  const saldoCaixa = useMemo(() => totalsOf(entries).balance, [entries]);
   const pai = list.parentId ? lists.find((l) => l.id === list.parentId) : undefined;
 
   const commitRename = () => {
