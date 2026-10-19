@@ -62,4 +62,10 @@ Stack: React 19 + TanStack Router/Start, Vite, Tailwind v4, Supabase (Postgres).
 
 - Projeto conectado ao Lovable: **não** reescrever histórico já publicado
   (force push / rebase / amend em commits enviados).
+- O `GITHUB_TOKEN` do sandbox é um token de GitHub App (`ghu_`) instalado
+  **apenas** em `johnadriansilva04-byte/cidadela-pracinha`. Neste repositório ele
+  é somente leitura: `git push` e qualquer escrita na API respondem 403
+  ("Resource not accessible by integration"). Não perca tempo tentando reenviar
+  o token — exporte as mudanças como patch e peça acesso de escrita:
+  `git format-patch origin/main..HEAD -o /workspace/push-fix`.
 
