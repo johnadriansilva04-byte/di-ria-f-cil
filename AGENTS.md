@@ -34,6 +34,11 @@ Stack: React 19 + TanStack Router/Start, Vite, Tailwind v4, Supabase (Postgres).
   pernas de `transferência` para não contar o mesmo valor duas vezes.
 - "Distribuir" gera 2 lançamentos (saída no caixa + entrada no envelope) marcados
   com `MARCA_TRANSFERENCIA`; `semTransferencias` os remove dos KPIs globais.
+- Cuidado com `semTransferencias`: use só em lançamentos **consolidados**
+  (caixa + envelopes), onde as duas pernas se cancelariam. No cartão de um caixa
+  os lançamentos já são os da própria lista, então filtrar ali devolve o dinheiro
+  que já saiu para os envelopes — o saldo livre (`saldoCaixa` em
+  `WalletDashboard`) é `totalsOf(entries).balance`, sem filtro.
 
 ### Apresentação (src/components)
 
