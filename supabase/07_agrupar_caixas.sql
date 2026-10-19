@@ -31,17 +31,24 @@ create table if not exists public.listas_parent_backup (
   migrado_em timestamptz not null default now()
 );
 
+-- O backup não é dado de app: ninguém precisa lê-lo pela API. RLS ligado e
+-- sem policies (nem grants para anon/authenticated) fecha a leitura pública.
+alter table public.listas_parent_backup enable row level security;
+revoke all on public.listas_parent_backup from anon, authenticated;
+
 insert into public.listas_parent_backup (lista_id, parent_id_anterior)
 select l.id, l.parent_id
   from public.listas l
  where l.parent_id is null
 on conflict (lista_id) do nothing;
 
--- 3) Agrupamento: para cada usuário que tenha uma lista chamada "Minha Dívida",
---    essa lista é o caixa principal e as demais listas raiz viram envelopes.
+-- 3) Agrupamento: para cada usuário que tenha um caixa "Minha Dívida", esse
+--    caixa é a raiz e os envelopes nomeados abaixo passam a pertencer a ele.
+--    A comparação ignora acento/caixa ("Minha Divida" == "Minha Dívida").
+--    Listas raiz que NÃO estão na lista (ex.: caixas criados pelo usuário)
+--    ficam intocadas — continuam sendo caixas principais independentes.
 do $$
 declare
-  v_raiz text := 'Minha Dívida';
   v_afetadas integer;
 begin
   update public.listas l
@@ -50,11 +57,13 @@ begin
       select user_id, id
         from public.listas
        where parent_id is null
-         and nome = v_raiz
+         and translate(lower(nome), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc') = 'minha divida'
     ) as raiz
    where l.user_id = raiz.user_id
      and l.parent_id is null
-     and l.id <> raiz.id;
+     and l.id <> raiz.id
+     and translate(lower(l.nome), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')
+         in ('pizzaria sh', 'gasolina e oleo', 'bobagens', 'divida r');
 
   get diagnostics v_afetadas = row_count;
   raise notice 'Listas agrupadas como envelopes: %', v_afetadas;

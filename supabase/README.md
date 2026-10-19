@@ -10,8 +10,12 @@ Execute os arquivos em ordem no SQL Editor do Supabase:
 4. **04_functions.sql** - Configura funções e triggers
 5. **05_envelopes.sql** - Adiciona `parent_id` em listas (hierarquia caixa → mini caixas)
 6. **06_compactar.sql** - Função `compactar_lancamentos`: enxuga meses antigos (soma + apaga o bruto)
-7. **07_agrupar_caixas.sql** - Correção de hierarquia: agrupa as listas soltas como
-   envelopes de um único caixa principal ("Minha Dívida"). Idempotente e reversível.
+7. **07_agrupar_caixas.sql** - Correção de hierarquia: agrupa os envelopes nomeados
+   (`Pizzaria SH`, `Gasolina e óleo`, `Bobagens`, `Dívida R`) sob o caixa principal
+   `Minha Dívida`. Compara o nome ignorando acento e caixa (`Minha Divida` == `Minha Dívida`).
+   Listas raiz que não estão nessa relação — inclusive caixas criados pelo usuário, como
+   `Caixa rotativo` — ficam intocadas. Idempotente e reversível (backup em
+   `listas_parent_backup`, com RLS ligado e sem acesso por anon/authenticated).
 
 ## Tabelas Criadas
 
