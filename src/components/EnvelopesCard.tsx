@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeftRight, Check, Layers, Loader2, Plus, X } from "lucide-react";
+import { Check, Layers, Loader2, Plus, X } from "lucide-react";
 import { brl, brlCompact, errorMessage, toNumber, type Totals, type WalletList } from "@/lib/caixa";
 import { cn } from "@/lib/utils";
+import { AllocationBar } from "./AllocationBar";
 
 interface EnvelopesCardProps {
   /** Caixa aberto (lista raiz). O card só existe para raízes. */
@@ -152,85 +153,95 @@ export function EnvelopesCard({
           </p>
         </div>
       ) : (
-        <ul className="space-y-2">
-          {envelopes.map((env) => {
-            const totais = summaries[env.id];
-            const saldo = totais?.balance ?? 0;
-            const aberto = distribuindoPara === env.id;
+        <>
+          <div className="mb-4">
+            <AllocationBar
+              envelopes={envelopes}
+              summaries={summaries}
+              caixaLivre={caixaSaldo}
+              onOpenEnvelope={onOpen}
+            />
+          </div>
+          <ul className="space-y-2">
+            {envelopes.map((env) => {
+              const totais = summaries[env.id];
+              const saldo = totais?.balance ?? 0;
+              const aberto = distribuindoPara === env.id;
 
-            return (
-              <li key={env.id} className="rounded-xl border border-border/60 bg-secondary/30 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onOpen(env.id)}
-                    className="min-w-0 flex-1 text-left"
-                    aria-label={`Abrir envelope ${env.name}`}
-                  >
-                    <span className="block truncate text-sm font-semibold hover:text-primary">
-                      {env.name}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] text-muted-foreground/70">
-                      {totais?.count ?? 0} {totais?.count === 1 ? "lançamento" : "lançamentos"}
-                    </span>
-                  </button>
-                  <span
-                    className={cn(
-                      "shrink-0 font-[family-name:var(--font-display)] text-sm font-bold tabular-nums",
-                      saldo < 0
-                        ? "text-expense"
-                        : saldo > 0
-                          ? "text-income"
-                          : "text-muted-foreground",
-                    )}
-                  >
-                    {brl(saldo)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => (aberto ? fecharDistribuicao() : setDistribuindoPara(env.id))}
-                    className="shrink-0 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/20"
-                  >
-                    Distribuir
-                  </button>
-                </div>
-
-                {saldo < 0 ? (
-                  <p className="mt-1.5 text-[10px] font-medium text-expense">
-                    Reserva estourada — faltou {brl(Math.abs(saldo))}
-                  </p>
-                ) : null}
-
-                {aberto ? (
-                  <div className="mt-2.5 flex items-center gap-1.5 border-t border-border/60 pt-2.5">
-                    <span className="text-xs text-muted-foreground">R$</span>
-                    <input
-                      autoFocus
-                      value={valor}
-                      onChange={(e) => setValor(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") distribuir(env.id, env.name);
-                        if (e.key === "Escape") fecharDistribuicao();
-                      }}
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      aria-label={`Valor a distribuir para ${env.name}`}
-                      className={inputClass}
-                    />
+              return (
+                <li key={env.id} className="rounded-xl border border-border/60 bg-secondary/30 p-3">
+                  <div className="flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => distribuir(env.id, env.name)}
-                      disabled={busy}
-                      className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                      onClick={() => onOpen(env.id)}
+                      className="min-w-0 flex-1 text-left"
+                      aria-label={`Abrir envelope ${env.name}`}
                     >
-                      {busy ? <Loader2 className="size-3.5 animate-spin" /> : "Mandar"}
+                      <span className="block truncate text-sm font-semibold hover:text-primary">
+                        {env.name}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground/70">
+                        {totais?.count ?? 0} {totais?.count === 1 ? "lançamento" : "lançamentos"}
+                      </span>
+                    </button>
+                    <span
+                      className={cn(
+                        "shrink-0 font-[family-name:var(--font-display)] text-sm font-bold tabular-nums",
+                        saldo < 0
+                          ? "text-expense"
+                          : saldo > 0
+                            ? "text-income"
+                            : "text-muted-foreground",
+                      )}
+                    >
+                      {brl(saldo)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => (aberto ? fecharDistribuicao() : setDistribuindoPara(env.id))}
+                      className="shrink-0 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/20"
+                    >
+                      Distribuir
                     </button>
                   </div>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+
+                  {saldo < 0 ? (
+                    <p className="mt-1.5 text-[10px] font-medium text-expense">
+                      Reserva estourada — faltou {brl(Math.abs(saldo))}
+                    </p>
+                  ) : null}
+
+                  {aberto ? (
+                    <div className="mt-2.5 flex items-center gap-1.5 border-t border-border/60 pt-2.5">
+                      <span className="text-xs text-muted-foreground">R$</span>
+                      <input
+                        autoFocus
+                        value={valor}
+                        onChange={(e) => setValor(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") distribuir(env.id, env.name);
+                          if (e.key === "Escape") fecharDistribuicao();
+                        }}
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        aria-label={`Valor a distribuir para ${env.name}`}
+                        className={inputClass}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => distribuir(env.id, env.name)}
+                        disabled={busy}
+                        className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                      >
+                        {busy ? <Loader2 className="size-3.5 animate-spin" /> : "Mandar"}
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
 
       {erro ? <p className="mt-2 text-[11px] font-medium text-destructive">{erro}</p> : null}

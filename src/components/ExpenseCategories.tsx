@@ -2,23 +2,13 @@ import { useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { PieChart as PieChartIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { brl, brlCompact, type Entry, filterByPeriod, type Period } from "@/lib/caixa";
+import { corDoIndice } from "@/lib/palette";
 
 interface ExpenseCategoriesProps {
   entries: Entry[];
   period?: Period;
 }
-
-const CATEGORY_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-  "var(--expense)",
-  "var(--primary)",
-];
 
 const config = {
   value: { label: "Valor" },
@@ -109,7 +99,7 @@ export function ExpenseCategories({ entries, period = "mes" }: ExpenseCategories
                   strokeWidth={0}
                 >
                   {categories.map((_, index) => (
-                    <Cell key={index} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                    <Cell key={index} fill={corDoIndice(index)} />
                   ))}
                 </Pie>
               </PieChart>
@@ -121,10 +111,7 @@ export function ExpenseCategories({ entries, period = "mes" }: ExpenseCategories
           {categories.map((category, index) => (
             <div key={category.name} className="flex items-center justify-between py-2">
               <div className="flex items-center gap-2">
-                <span
-                  className="size-3 rounded-full"
-                  style={{ background: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }}
-                />
+                <span className="size-3 rounded-full" style={{ background: corDoIndice(index) }} />
                 <span className="text-xs text-muted-foreground">{category.name}</span>
               </div>
               <div className="text-right">

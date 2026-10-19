@@ -69,10 +69,12 @@ export function WalletSidebar({
     if (editingId) editInputRef.current?.focus();
   }, [editingId]);
 
-  const totalGeral = lists.reduce((acc, list) => acc + (summaries[list.id]?.balance ?? 0), 0);
   // Caixas raiz; os envelopes ficam aninhados embaixo do caixa pai.
   const raizes = lists.filter((l) => !l.parentId);
   const filhasDe = (id: string) => lists.filter((l) => l.parentId === id);
+  // O saldo do caixa raiz já é o CONSOLIDADO (caixa + envelopes), então o
+  // total geral soma só as raízes — somar os envelopes aqui contaria duas vezes.
+  const totalGeral = raizes.reduce((acc, list) => acc + (summaries[list.id]?.balance ?? 0), 0);
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -158,7 +160,7 @@ export function WalletSidebar({
           >
             <Home className="size-5" />
           </button>
-          {lists.map((list) => (
+          {raizes.map((list) => (
             <button
               key={list.id}
               type="button"

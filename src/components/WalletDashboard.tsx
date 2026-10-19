@@ -3,6 +3,7 @@ import { ArrowLeft, Check, FileText, Pencil, X } from "lucide-react";
 import {
   filterByPeriod,
   monthlySeries,
+  semTransferencias,
   totalsOf,
   type Entry,
   type EntryPatch,
@@ -21,7 +22,13 @@ import { WalletSummary } from "./WalletSummary";
 interface WalletDashboardProps {
   list: WalletList;
   lists: WalletList[];
+  /** Lançamentos da própria lista (o que sai/entra direto nela). */
   entries: Entry[];
+  /**
+   * Contabilidade do caixa: no caixa principal inclui os envelopes; num
+   * envelope é só ele. Usado nos totais consolidados e no extrato.
+   */
+  familyEntries: Entry[];
   loading: boolean;
   daily: string;
   hourRate: string;
@@ -47,6 +54,7 @@ export function WalletDashboard({
   list,
   lists,
   entries,
+  familyEntries,
   loading,
   daily,
   hourRate,
@@ -75,12 +83,19 @@ export function WalletDashboard({
     setShowStatement(false);
   }, [list.id, list.name]);
 
-  const periodEntries = useMemo(() => filterByPeriod(entries, period), [entries, period]);
+  // Num caixa principal, o resumo soma a contabilidade inteira (caixa +
+  // envelopes); num envelope, só ele mesmo.
+  const resumoEntries = list.parentId ? entries : familyEntries;
+  const periodEntries = useMemo(
+    () => filterByPeriod(resumoEntries, period),
+    [resumoEntries, period],
+  );
   const totals = useMemo(() => totalsOf(periodEntries), [periodEntries]);
   const recent = periodEntries.slice(0, RECENT_LIMIT);
-  const serie = useMemo(() => monthlySeries(entries), [entries]);
-  // Limite de distribuição é o saldo TODO do caixa, não o do período visível.
-  const saldoCaixa = useMemo(() => totalsOf(entries).balance, [entries]);
+  const serie = useMemo(() => monthlySeries(resumoEntries), [resumoEntries]);
+  // Limite de distribuição é o saldo LIVRE do caixa (sem os envelopes), não o
+  // consolidado: só dá para separar o que ainda está no caixa.
+  const saldoCaixa = useMemo(() => totalsOf(semTransferencias(entries)).balance, [entries]);
   const pai = list.parentId ? lists.find((l) => l.id === list.parentId) : undefined;
 
   const commitRename = () => {
@@ -97,7 +112,7 @@ export function WalletDashboard({
   if (showStatement) {
     return (
       <StatementView
-        entries={entries}
+        entries={resumoEntries}
         lists={lists}
         loading={loading}
         walletName={list.name}

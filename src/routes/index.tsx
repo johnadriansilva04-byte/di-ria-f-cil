@@ -393,7 +393,7 @@ function Dashboard({ session }: { session: Session }) {
             <p className="text-sm font-medium text-destructive">{error}</p>
             {caixa.migrationNeeded ? (
               <code className="rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] text-destructive">
-                supabase/setup_completo.sql
+                supabase/01_tables.sql
               </code>
             ) : (
               <button
@@ -427,6 +427,7 @@ function Dashboard({ session }: { session: Session }) {
               list={caixa.activeList}
               lists={caixa.lists}
               entries={caixa.activeEntries}
+              familyEntries={caixa.familyEntries}
               loading={caixa.loading}
               daily={daily}
               hourRate={hourRate}
