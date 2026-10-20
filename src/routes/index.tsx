@@ -456,11 +456,22 @@ function Dashboard({ session }: { session: Session }) {
                 await caixa.distribuir({
                   deId: caixa.activeList!.id,
                   deNome: caixa.activeList!.name,
-                  paraId: input.paraId,
-                  paraNome: input.paraNome,
+                  paraId: input.envelopeId,
+                  paraNome: input.envelopeNome,
                   amount: input.amount,
                 });
               }}
+              onReturn={async (input) => {
+                // Caminho inverso: o envelope é a origem e o caixa aberto o destino.
+                await caixa.devolver({
+                  deId: input.envelopeId,
+                  deNome: input.envelopeNome,
+                  paraId: caixa.activeList!.id,
+                  paraNome: caixa.activeList!.name,
+                  amount: input.amount,
+                });
+              }}
+              onDeleteEnvelope={caixa.removeList}
               onOpenEnvelope={handleSelectList}
               onBackToCaixa={() => {
                 const parentId = caixa.activeList?.parentId;

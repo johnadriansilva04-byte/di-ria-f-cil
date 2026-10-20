@@ -8,6 +8,7 @@ import {
   deleteEntry,
   deleteList,
   distribuir as distribuirNoBanco,
+  devolver as devolverNoBanco,
   deleteMyAccount,
   errorMessage,
   familyEntriesOf,
@@ -286,6 +287,25 @@ export function useCaixa(userId: string) {
   );
 
   /**
+   * Traz o valor de um envelope de volta para o caixa (o inverso de distribuir).
+   * Também é movimentação interna: não mexe no total geral.
+   */
+  const devolver = useCallback(
+    async (input: {
+      deId: string;
+      deNome: string;
+      paraId: string;
+      paraNome: string;
+      amount: number;
+    }) => {
+      const par = await mutate(() => devolverNoBanco({ userId, ...input }));
+      setEntries((prev) => [par.entrada, par.saida, ...prev]);
+      return par;
+    },
+    [userId, mutate],
+  );
+
+  /**
    * Limpeza pesada: um único request no servidor compacta vários meses e
    * depois a tela é carregada de novo com a tabela enxuta.
    */
@@ -408,6 +428,7 @@ export function useCaixa(userId: string) {
     editList,
     removeList,
     distribuir,
+    devolver,
     otimizar,
     updatePerfil,
     deleteAccount,

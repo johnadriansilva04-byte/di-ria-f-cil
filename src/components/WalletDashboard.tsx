@@ -11,7 +11,7 @@ import {
   type WalletList,
 } from "@/lib/caixa";
 import type { NewEntry } from "@/hooks/use-caixa";
-import { EnvelopesCard } from "./EnvelopesCard";
+import { EnvelopesCard, type MovimentoEnvelope } from "./EnvelopesCard";
 import { EntryRow } from "./EntryRow";
 import { FlowChart } from "./FlowChart";
 import { StatementView } from "./StatementView";
@@ -42,7 +42,12 @@ interface WalletDashboardProps {
   summaries: Record<string, Totals>;
   envelopes: WalletList[];
   onCreateEnvelope: (name: string) => Promise<void>;
-  onDistribute: (input: { paraId: string; paraNome: string; amount: number }) => Promise<void>;
+  /** Envia valor do caixa para o envelope. */
+  onDistribute: (input: MovimentoEnvelope) => Promise<void>;
+  /** Traz o valor de um envelope de volta para o caixa. */
+  onReturn: (input: MovimentoEnvelope) => Promise<void>;
+  /** Exclui um envelope (e os lançamentos dele). */
+  onDeleteEnvelope: (id: string) => Promise<void>;
   onOpenEnvelope: (id: string) => void;
   onBackToCaixa?: (() => void) | undefined;
 }
@@ -68,6 +73,8 @@ export function WalletDashboard({
   envelopes,
   onCreateEnvelope,
   onDistribute,
+  onReturn,
+  onDeleteEnvelope,
   onOpenEnvelope,
   onBackToCaixa,
 }: WalletDashboardProps) {
@@ -219,6 +226,8 @@ export function WalletDashboard({
                   summaries={summaries}
                   onCreate={onCreateEnvelope}
                   onDistribute={onDistribute}
+                  onReturn={onReturn}
+                  onDelete={onDeleteEnvelope}
                   onOpen={onOpenEnvelope}
                 />
               ) : null}

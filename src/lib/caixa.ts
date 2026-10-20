@@ -618,12 +618,12 @@ export async function deleteEntry(id: string): Promise<void> {
   if (!data || data.length === 0) throw new Error(NOTHING_CHANGED);
 }
 
-// ── Distribuição (caixa → envelope) ─────────────────────────────
+// ── Transferências internas (caixa ↔ envelope) ───────────────────
 
-/** Marca nas pernas de uma distribuição, para separá-la de gasto de verdade. */
+/** Marca nas pernas de uma transferência, para separá-la de gasto de verdade. */
 export const MARCA_TRANSFERENCIA = "transferência";
 
-/** Distribuição é movimentação interna: não conta como receita/gasto global. */
+/** Transferência é movimentação interna: não conta como receita/gasto global. */
 export const isTransferencia = (e: Entry) => (e.detail ?? "").includes(MARCA_TRANSFERENCIA);
 
 export const semTransferencias = (entries: Entry[]) => entries.filter((e) => !isTransferencia(e));
@@ -637,30 +637,41 @@ export type DistribuicaoInput = {
   amount: number;
 };
 
+/** Textos das duas pernas (rótulo + detalhe) e do estorno de emergência. */
+type TextoTransferencia = {
+  rotuloSaida: string;
+  rotuloEntrada: string;
+  detalheSaida: string;
+  detalheEntrada: string;
+  rotuloEstorno: string;
+};
+
 /**
- * Manda valor do caixa para um envelope: sai do caixa e entra no envelope.
- * São dois lançamentos (o Supabase não dá transação daqui); se a perna de
- * entrada falhar, a de volta é lançada para o dinheiro não sumir.
+ * As duas pernas de uma transferência interna: saída na origem e entrada no
+ * destino. O Supabase não dá transação daqui, então se a perna de entrada
+ * falhar uma devolução é lançada na origem para o dinheiro não sumir — e o
+ * erro original é propagado para a tela avisar.
  */
-export async function distribuir(
+async function duasPernas(
   input: DistribuicaoInput,
+  texto: TextoTransferencia,
 ): Promise<{ saida: Entry; entrada: Entry }> {
   const saida = await insertEntry({
     userId: input.userId,
     listaId: input.deId,
-    label: `Distribuído para ${input.paraNome}`,
+    label: texto.rotuloSaida,
     kind: "saida",
     amount: input.amount,
-    detail: `${MARCA_TRANSFERENCIA} de ${input.deNome}`,
+    detail: texto.detalheSaida,
   });
   try {
     const entrada = await insertEntry({
       userId: input.userId,
       listaId: input.paraId,
-      label: "Recebido do caixa",
+      label: texto.rotuloEntrada,
       kind: "entrada",
       amount: input.amount,
-      detail: `${MARCA_TRANSFERENCIA} do caixa ${input.deNome}`,
+      detail: texto.detalheEntrada,
     });
     return { saida, entrada };
   } catch (e) {
@@ -668,7 +679,7 @@ export async function distribuir(
       await insertEntry({
         userId: input.userId,
         listaId: input.deId,
-        label: `Devolução de ${input.paraNome}`,
+        label: texto.rotuloEstorno,
         kind: "entrada",
         amount: input.amount,
         detail: `${MARCA_TRANSFERENCIA} (cancelada)`,
@@ -678,6 +689,32 @@ export async function distribuir(
     }
     throw e;
   }
+}
+
+/** Manda valor do caixa para um envelope: sai do caixa e entra no envelope. */
+export function distribuir(input: DistribuicaoInput): Promise<{ saida: Entry; entrada: Entry }> {
+  return duasPernas(input, {
+    rotuloSaida: `Distribuído para ${input.paraNome}`,
+    rotuloEntrada: "Recebido do caixa",
+    detalheSaida: `${MARCA_TRANSFERENCIA} de ${input.deNome}`,
+    detalheEntrada: `${MARCA_TRANSFERENCIA} do caixa ${input.deNome}`,
+    rotuloEstorno: `Devolução de ${input.paraNome}`,
+  });
+}
+
+/**
+ * Caminho inverso de `distribuir`: traz o valor de um envelope de volta para o
+ * caixa. Sai do envelope e entra no caixa, com o mesmo cuidado de não perder
+ * dinheiro se a segunda perna falhar.
+ */
+export function devolver(input: DistribuicaoInput): Promise<{ saida: Entry; entrada: Entry }> {
+  return duasPernas(input, {
+    rotuloSaida: `Devolvido para ${input.paraNome}`,
+    rotuloEntrada: `Devolvido do envelope ${input.deNome}`,
+    detalheSaida: `${MARCA_TRANSFERENCIA} para ${input.paraNome}`,
+    detalheEntrada: `${MARCA_TRANSFERENCIA} do envelope ${input.deNome}`,
+    rotuloEstorno: `Estorno de ${input.paraNome}`,
+  });
 }
 
 // ── Compactação (enxugar lancamentos) ───────────────────────
