@@ -11,7 +11,7 @@ import {
   type WalletList,
 } from "@/lib/caixa";
 import type { NewEntry } from "@/hooks/use-caixa";
-import { EnvelopesCard } from "./EnvelopesCard";
+import { EnvelopesCard, type MovimentoEnvelope } from "./EnvelopesCard";
 import { EntryRow } from "./EntryRow";
 import { FlowChart } from "./FlowChart";
 import { StatementView } from "./StatementView";
@@ -21,7 +21,13 @@ import { WalletSummary } from "./WalletSummary";
 interface WalletDashboardProps {
   list: WalletList;
   lists: WalletList[];
+  /** Lançamentos da própria lista (o que sai/entra direto nela). */
   entries: Entry[];
+  /**
+   * Contabilidade do caixa: no caixa principal inclui os envelopes; num
+   * envelope é só ele. Usado nos totais consolidados e no extrato.
+   */
+  familyEntries: Entry[];
   loading: boolean;
   daily: string;
   hourRate: string;
@@ -36,7 +42,12 @@ interface WalletDashboardProps {
   summaries: Record<string, Totals>;
   envelopes: WalletList[];
   onCreateEnvelope: (name: string) => Promise<void>;
-  onDistribute: (input: { paraId: string; paraNome: string; amount: number }) => Promise<void>;
+  /** Envia valor do caixa para o envelope. */
+  onDistribute: (input: MovimentoEnvelope) => Promise<void>;
+  /** Traz o valor de um envelope de volta para o caixa. */
+  onReturn: (input: MovimentoEnvelope) => Promise<void>;
+  /** Exclui um envelope (e os lançamentos dele). */
+  onDeleteEnvelope: (id: string) => Promise<void>;
   onOpenEnvelope: (id: string) => void;
   onBackToCaixa?: (() => void) | undefined;
 }
@@ -47,6 +58,7 @@ export function WalletDashboard({
   list,
   lists,
   entries,
+  familyEntries,
   loading,
   daily,
   hourRate,
@@ -61,6 +73,8 @@ export function WalletDashboard({
   envelopes,
   onCreateEnvelope,
   onDistribute,
+  onReturn,
+  onDeleteEnvelope,
   onOpenEnvelope,
   onBackToCaixa,
 }: WalletDashboardProps) {
@@ -75,11 +89,20 @@ export function WalletDashboard({
     setShowStatement(false);
   }, [list.id, list.name]);
 
-  const periodEntries = useMemo(() => filterByPeriod(entries, period), [entries, period]);
+  // Num caixa principal, o resumo soma a contabilidade inteira (caixa +
+  // envelopes); num envelope, só ele mesmo.
+  const resumoEntries = list.parentId ? entries : familyEntries;
+  const periodEntries = useMemo(
+    () => filterByPeriod(resumoEntries, period),
+    [resumoEntries, period],
+  );
   const totals = useMemo(() => totalsOf(periodEntries), [periodEntries]);
   const recent = periodEntries.slice(0, RECENT_LIMIT);
-  const serie = useMemo(() => monthlySeries(entries), [entries]);
-  // Limite de distribuição é o saldo TODO do caixa, não o do período visível.
+  const serie = useMemo(() => monthlySeries(resumoEntries), [resumoEntries]);
+  // Limite de distribuição é o saldo LIVRE do caixa, não o consolidado: só dá
+  // para separar o que ainda está nele. Como `entries` são os lançamentos da
+  // própria lista, o saldo já desconta o que saiu numa distribuição — filtrar
+  // `transferência` aqui devolveria o dinheiro que já foi para os envelopes.
   const saldoCaixa = useMemo(() => totalsOf(entries).balance, [entries]);
   const pai = list.parentId ? lists.find((l) => l.id === list.parentId) : undefined;
 
@@ -97,7 +120,7 @@ export function WalletDashboard({
   if (showStatement) {
     return (
       <StatementView
-        entries={entries}
+        entries={resumoEntries}
         lists={lists}
         loading={loading}
         walletName={list.name}
@@ -203,6 +226,8 @@ export function WalletDashboard({
                   summaries={summaries}
                   onCreate={onCreateEnvelope}
                   onDistribute={onDistribute}
+                  onReturn={onReturn}
+                  onDelete={onDeleteEnvelope}
                   onOpen={onOpenEnvelope}
                 />
               ) : null}

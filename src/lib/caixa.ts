@@ -201,6 +201,90 @@ export function totalsByList(entries: Entry[]): Record<string, Totals> {
   return map;
 }
 
+// ── Hierarquia caixa → envelopes ─────────────────────────────────────
+
+/** Caixas principais: listas sem pai. Só elas são unidades independentes. */
+export function rootsOf(lists: WalletList[]): WalletList[] {
+  return lists.filter((l) => !l.parentId);
+}
+
+/**
+ * Ids do caixa e de todos os envelopes abaixo dele (recursivo, sem repetir).
+ * Serve para somar a contabilidade inteira do caixa principal.
+ */
+export function familyIds(lists: WalletList[], rootId: string): string[] {
+  const byParent = new Map<string, string[]>();
+  for (const l of lists) {
+    if (!l.parentId) continue;
+    const siblings = byParent.get(l.parentId);
+    if (siblings) siblings.push(l.id);
+    else byParent.set(l.parentId, [l.id]);
+  }
+
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  const walk = (id: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+    for (const child of byParent.get(id) ?? []) walk(child);
+  };
+  walk(rootId);
+  return ids;
+}
+
+/**
+ * Lançamentos da contabilidade inteira de um caixa (ele + envelopes), já sem
+ * as pernas de distribuição — movimentação interna não é receita nem gasto.
+ */
+export function familyEntriesOf(lists: WalletList[], entries: Entry[], rootId: string): Entry[] {
+  const ids = new Set(familyIds(lists, rootId));
+  return entries.filter((e) => e.listaId && ids.has(e.listaId) && !isTransferencia(e));
+}
+
+/**
+ * Totais por lista para a interface: o caixa principal mostra o CONSOLIDADO
+ * (ele + envelopes) e cada envelope mostra o próprio saldo.
+ *
+ * Uma distribuição (saída no caixa + entrada no envelope) se anula, então o
+ * mesmo valor nunca é contado duas vezes; por isso as receitas/despesas do
+ * caixa ignoram as pernas de `transferência`.
+ *
+ * Percorre os lançamentos uma única vez: cada um entra no caixa principal dono
+ * da lista (mapa `dono`), em vez de varrer tudo de novo a cada caixa.
+ */
+export function totalsByRoot(lists: WalletList[], entries: Entry[]): Record<string, Totals> {
+  const map = totalsByList(entries);
+  const roots = rootsOf(lists);
+  if (roots.length === 0) return map;
+
+  // lista → caixa principal dono dela (o envelope aponta para a raiz).
+  const dono = new Map<string, string>();
+  for (const root of roots) {
+    for (const id of familyIds(lists, root.id)) dono.set(id, root.id);
+  }
+
+  const consolidado = new Map<string, Totals>();
+  for (const root of roots) consolidado.set(root.id, emptyTotals());
+
+  for (const e of entries) {
+    if (!e.listaId || isTransferencia(e)) continue;
+    const acc = consolidado.get(dono.get(e.listaId) ?? "");
+    if (!acc) continue;
+    if (e.kind === "entrada") acc.income += e.amount;
+    else acc.expense += e.amount;
+    acc.count += 1;
+  }
+
+  for (const root of roots) {
+    const acc = consolidado.get(root.id);
+    if (!acc) continue;
+    acc.balance = acc.income - acc.expense;
+    map[root.id] = acc;
+  }
+  return map;
+}
+
 export type MonthPoint = { key: string; label: string; income: number; expense: number };
 
 /** Série dos últimos meses da lista atual (para o gráfico). */
@@ -223,10 +307,64 @@ export function monthlySeries(entries: Entry[], months = 6): MonthPoint[] {
   return points;
 }
 
+// ── Composição (apresentação) ────────────────────────────────────────
+
+/** Quanto cada envelope (ou o livre do caixa) pesa no total do caixa. */
+export type Alocacao = {
+  /** id da lista; `null` é a fatia “livre no caixa”. */
+  id: string | null;
+  nome: string;
+  valor: number;
+  /** Fração 0..1 do total (o total é a soma dos módulos). */
+  fracao: number;
+};
+
+/**
+ * Reparte o caixa (e seus envelopes) em fatias de apresentação.
+ *
+ * O todo é a soma dos módulos das partes: o livre do caixa + o saldo de cada
+ * envelope. Assim a barra sempre fecha 100% e mostra para onde o dinheiro
+ * foi, sem contar nada duas vezes (cada lançamento vive numa única lista).
+ *
+ * - `caixaLivre` é o saldo do caixa SEM os envelopes (só o que ainda está nele);
+ * - valores zerados ficam de fora para a legenda não encher de ruído.
+ */
+export function alocacaoDoCaixa(
+  envelopes: WalletList[],
+  summaries: Record<string, Totals>,
+  caixaLivre: number,
+): Alocacao[] {
+  const partes: Omit<Alocacao, "fracao">[] = [];
+  if (caixaLivre !== 0) partes.push({ id: null, nome: "Livre no caixa", valor: caixaLivre });
+  for (const env of envelopes) {
+    const saldo = summaries[env.id]?.balance ?? 0;
+    if (saldo !== 0) partes.push({ id: env.id, nome: env.name, valor: saldo });
+  }
+  const total = partes.reduce((sum, p) => sum + Math.abs(p.valor), 0);
+  if (total === 0) return [];
+  return partes.map((p) => ({ ...p, fracao: Math.abs(p.valor) / total }));
+}
+
+/** Ponto de série (sem rótulo) para o mini gráfico de tendência. */
+export type TrendPoint = { key: string; value: number };
+
+/**
+ * Série de saldo acumulado mês a mês, para o sparkline dos cartões de caixa.
+ * Parte de zero e vai somando o resultado (receitas − despesas) de cada mês.
+ */
+export function balanceTrend(entries: Entry[], months = 6): TrendPoint[] {
+  const serie = monthlySeries(entries, months);
+  let acumulado = 0;
+  return serie.map((p) => {
+    acumulado += p.income - p.expense;
+    return { key: p.key, value: acumulado };
+  });
+}
+
 // ── Erros ────────────────────────────────────────────────────────────
 
 export const LISTS_MIGRATION_HINT =
-  "O banco ainda não tem a tabela de listas. Rode o arquivo supabase/setup_completo.sql no SQL Editor do Supabase.";
+  "O banco ainda não tem a tabela de listas. Rode o arquivo supabase/01_tables.sql no SQL Editor do Supabase.";
 
 export const ENVELOPES_MIGRATION_HINT =
   "O banco ainda não tem os envelopes (parent_id). Rode o arquivo supabase/05_envelopes.sql no SQL Editor do Supabase.";
@@ -243,6 +381,18 @@ export function isMissingListsTable(error: unknown): boolean {
     err.code === "PGRST205" ||
     message.includes("public.listas") ||
     message.includes('relation "listas"')
+  );
+}
+
+/** A coluna parent_id ainda não existe no banco (05_envelopes.sql não rodou). */
+export function isMissingParentColumn(error: unknown): boolean {
+  const err = error as { code?: string; message?: string } | null;
+  if (!err) return false;
+  const message = err.message ?? "";
+  return (
+    err.code === "42703" ||
+    (message.includes("parent_id") &&
+      (message.includes("does not exist") || message.includes("column")))
   );
 }
 
@@ -270,15 +420,27 @@ const toList = (r: ListRow): WalletList => ({
 });
 
 export async function fetchLists(userId: string): Promise<WalletList[]> {
-  const { data, error } = await supabase
+  const query = () =>
+    supabase
+      .from("listas")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
+
+  const { data, error } = await query();
+  if (!error) return (data ?? []).map((r) => toList(r as ListRow));
+
+  // A coluna parent_id pode não existir ainda (05_envelopes.sql não rodou).
+  // Nesse caso a leitura continua: sem hierarquia, toda lista é caixa raiz.
+  if (!isMissingParentColumn(error)) throw error;
+
+  const { data: fallback, error: fallbackError } = await supabase
     .from("listas")
-    // select * de propósito: enquanto a coluna parent_id não existir no banco
-    // (05_envelopes.sql ainda não rodou), a leitura segue funcionando.
-    .select("*")
+    .select("id, nome, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
-  if (error) throw error;
-  return (data ?? []).map((r) => toList(r as ListRow));
+  if (fallbackError) throw fallbackError;
+  return (fallback ?? []).map((r) => toList(r as ListRow));
 }
 
 export async function createList(
@@ -456,12 +618,12 @@ export async function deleteEntry(id: string): Promise<void> {
   if (!data || data.length === 0) throw new Error(NOTHING_CHANGED);
 }
 
-// ── Distribuição (caixa → envelope) ─────────────────────────────
+// ── Transferências internas (caixa ↔ envelope) ───────────────────
 
-/** Marca nas pernas de uma distribuição, para separá-la de gasto de verdade. */
+/** Marca nas pernas de uma transferência, para separá-la de gasto de verdade. */
 export const MARCA_TRANSFERENCIA = "transferência";
 
-/** Distribuição é movimentação interna: não conta como receita/gasto global. */
+/** Transferência é movimentação interna: não conta como receita/gasto global. */
 export const isTransferencia = (e: Entry) => (e.detail ?? "").includes(MARCA_TRANSFERENCIA);
 
 export const semTransferencias = (entries: Entry[]) => entries.filter((e) => !isTransferencia(e));
@@ -475,30 +637,41 @@ export type DistribuicaoInput = {
   amount: number;
 };
 
+/** Textos das duas pernas (rótulo + detalhe) e do estorno de emergência. */
+type TextoTransferencia = {
+  rotuloSaida: string;
+  rotuloEntrada: string;
+  detalheSaida: string;
+  detalheEntrada: string;
+  rotuloEstorno: string;
+};
+
 /**
- * Manda valor do caixa para um envelope: sai do caixa e entra no envelope.
- * São dois lançamentos (o Supabase não dá transação daqui); se a perna de
- * entrada falhar, a de volta é lançada para o dinheiro não sumir.
+ * As duas pernas de uma transferência interna: saída na origem e entrada no
+ * destino. O Supabase não dá transação daqui, então se a perna de entrada
+ * falhar uma devolução é lançada na origem para o dinheiro não sumir — e o
+ * erro original é propagado para a tela avisar.
  */
-export async function distribuir(
+async function duasPernas(
   input: DistribuicaoInput,
+  texto: TextoTransferencia,
 ): Promise<{ saida: Entry; entrada: Entry }> {
   const saida = await insertEntry({
     userId: input.userId,
     listaId: input.deId,
-    label: `Distribuído para ${input.paraNome}`,
+    label: texto.rotuloSaida,
     kind: "saida",
     amount: input.amount,
-    detail: `${MARCA_TRANSFERENCIA} de ${input.deNome}`,
+    detail: texto.detalheSaida,
   });
   try {
     const entrada = await insertEntry({
       userId: input.userId,
       listaId: input.paraId,
-      label: "Recebido do caixa",
+      label: texto.rotuloEntrada,
       kind: "entrada",
       amount: input.amount,
-      detail: `${MARCA_TRANSFERENCIA} do caixa ${input.deNome}`,
+      detail: texto.detalheEntrada,
     });
     return { saida, entrada };
   } catch (e) {
@@ -506,7 +679,7 @@ export async function distribuir(
       await insertEntry({
         userId: input.userId,
         listaId: input.deId,
-        label: `Devolução de ${input.paraNome}`,
+        label: texto.rotuloEstorno,
         kind: "entrada",
         amount: input.amount,
         detail: `${MARCA_TRANSFERENCIA} (cancelada)`,
@@ -516,6 +689,32 @@ export async function distribuir(
     }
     throw e;
   }
+}
+
+/** Manda valor do caixa para um envelope: sai do caixa e entra no envelope. */
+export function distribuir(input: DistribuicaoInput): Promise<{ saida: Entry; entrada: Entry }> {
+  return duasPernas(input, {
+    rotuloSaida: `Distribuído para ${input.paraNome}`,
+    rotuloEntrada: "Recebido do caixa",
+    detalheSaida: `${MARCA_TRANSFERENCIA} de ${input.deNome}`,
+    detalheEntrada: `${MARCA_TRANSFERENCIA} do caixa ${input.deNome}`,
+    rotuloEstorno: `Devolução de ${input.paraNome}`,
+  });
+}
+
+/**
+ * Caminho inverso de `distribuir`: traz o valor de um envelope de volta para o
+ * caixa. Sai do envelope e entra no caixa, com o mesmo cuidado de não perder
+ * dinheiro se a segunda perna falhar.
+ */
+export function devolver(input: DistribuicaoInput): Promise<{ saida: Entry; entrada: Entry }> {
+  return duasPernas(input, {
+    rotuloSaida: `Devolvido para ${input.paraNome}`,
+    rotuloEntrada: `Devolvido do envelope ${input.deNome}`,
+    detalheSaida: `${MARCA_TRANSFERENCIA} para ${input.paraNome}`,
+    detalheEntrada: `${MARCA_TRANSFERENCIA} do envelope ${input.deNome}`,
+    rotuloEstorno: `Estorno de ${input.paraNome}`,
+  });
 }
 
 // ── Compactação (enxugar lancamentos) ───────────────────────
@@ -546,7 +745,7 @@ export async function deleteMyAccount(): Promise<void> {
       error.message.includes("excluir_minha_conta")
     ) {
       throw new Error(
-        "O banco ainda não tem a função de exclusão de conta. Rode supabase/setup_completo.sql no SQL Editor do Supabase.",
+        "O banco ainda não tem a função de exclusão de conta. Rode supabase/04_functions.sql no SQL Editor do Supabase.",
       );
     }
     throw error;

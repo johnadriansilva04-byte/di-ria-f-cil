@@ -12,6 +12,7 @@ import {
   brl,
   brlCompact,
   errorMessage,
+  formatDate,
   today,
   toNumber,
   type Entry,
@@ -397,9 +398,4 @@ export function TransactionForm({
       </div>
     </section>
   );
-}
-
-function formatDate(iso: string) {
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
 }

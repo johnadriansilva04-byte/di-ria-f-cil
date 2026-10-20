@@ -8,8 +8,10 @@ import {
   deleteEntry,
   deleteList,
   distribuir as distribuirNoBanco,
+  devolver as devolverNoBanco,
   deleteMyAccount,
   errorMessage,
+  familyEntriesOf,
   fetchEntries,
   fetchLists,
   fetchPerfil,
@@ -18,9 +20,10 @@ import {
   LISTS_MIGRATION_HINT,
   readLegacyLocalLists,
   renameList,
+  rootsOf,
   savePerfil,
   setActiveListId,
-  totalsByList,
+  totalsByRoot,
   updateEntry,
   type Entry,
   type EntryPatch,
@@ -284,6 +287,25 @@ export function useCaixa(userId: string) {
   );
 
   /**
+   * Traz o valor de um envelope de volta para o caixa (o inverso de distribuir).
+   * Também é movimentação interna: não mexe no total geral.
+   */
+  const devolver = useCallback(
+    async (input: {
+      deId: string;
+      deNome: string;
+      paraId: string;
+      paraNome: string;
+      amount: number;
+    }) => {
+      const par = await mutate(() => devolverNoBanco({ userId, ...input }));
+      setEntries((prev) => [par.entrada, par.saida, ...prev]);
+      return par;
+    },
+    [userId, mutate],
+  );
+
+  /**
    * Limpeza pesada: um único request no servidor compacta vários meses e
    * depois a tela é carregada de novo com a tabela enxuta.
    */
@@ -350,22 +372,46 @@ export function useCaixa(userId: string) {
     () => lists.find((l) => l.id === activeListId) ?? null,
     [lists, activeListId],
   );
+  /** Só os caixas principais são unidades independentes. */
+  const roots = useMemo(() => rootsOf(lists), [lists]);
   const activeEntries = useMemo(
     () => entries.filter((e) => e.listaId === activeListId),
     [entries, activeListId],
   );
+  /**
+   * Contabilidade inteira do caixa aberto: no caixa principal entram ele e os
+   * envelopes; num envelope entra só ele. As pernas de distribuição saem
+   * porque são movimentação interna (já aparecem no extrato de cada lista).
+   * Serve para o total do caixa, que soma o caixa + os envelopes sem duplicar.
+   */
+  const familyEntries = useMemo(() => {
+    if (!activeListId) return [];
+    if (activeList?.parentId) return activeEntries;
+    return familyEntriesOf(lists, entries, activeListId);
+  }, [activeList, activeListId, activeEntries, entries, lists]);
   /** Mini caixas (envelopes) do caixa aberto agora. */
   const envelopes = useMemo(
     () => (activeListId ? lists.filter((l) => l.parentId === activeListId) : []),
     [lists, activeListId],
   );
-  const summaries: Record<string, Totals> = useMemo(() => totalsByList(entries), [entries]);
+  /**
+   * Totais da interface: o caixa principal aparece CONSOLIDADO (ele + os
+   * envelopes) e cada envelope mostra o próprio saldo. Como os totais do
+   * caixa ignoram as pernas de distribuição, o mesmo valor nunca é contado
+   * duas vezes.
+   */
+  const summaries: Record<string, Totals> = useMemo(
+    () => totalsByRoot(lists, entries),
+    [lists, entries],
+  );
 
   return {
     lists,
+    roots,
     entries,
     activeList,
     activeEntries,
+    familyEntries,
     activeListId,
     envelopes,
     summaries,
@@ -382,6 +428,7 @@ export function useCaixa(userId: string) {
     editList,
     removeList,
     distribuir,
+    devolver,
     otimizar,
     updatePerfil,
     deleteAccount,

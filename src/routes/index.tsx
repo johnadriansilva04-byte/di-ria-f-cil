@@ -290,6 +290,9 @@ function Dashboard({ session }: { session: Session }) {
             await caixa.addList(name);
             setView("lista");
           }}
+          onCreateEnvelope={async (parentId, name) => {
+            await caixa.addList(name, parentId);
+          }}
           onRename={caixa.editList}
           onDelete={caixa.removeList}
           telefone={telefone}
@@ -319,6 +322,9 @@ function Dashboard({ session }: { session: Session }) {
               onCreate={async (name) => {
                 await caixa.addList(name);
                 setView("lista");
+              }}
+              onCreateEnvelope={async (parentId, name) => {
+                await caixa.addList(name, parentId);
               }}
               onRename={caixa.editList}
               onDelete={caixa.removeList}
@@ -393,7 +399,7 @@ function Dashboard({ session }: { session: Session }) {
             <p className="text-sm font-medium text-destructive">{error}</p>
             {caixa.migrationNeeded ? (
               <code className="rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] text-destructive">
-                supabase/setup_completo.sql
+                supabase/01_tables.sql
               </code>
             ) : (
               <button
@@ -427,6 +433,7 @@ function Dashboard({ session }: { session: Session }) {
               list={caixa.activeList}
               lists={caixa.lists}
               entries={caixa.activeEntries}
+              familyEntries={caixa.familyEntries}
               loading={caixa.loading}
               daily={daily}
               hourRate={hourRate}
@@ -449,11 +456,22 @@ function Dashboard({ session }: { session: Session }) {
                 await caixa.distribuir({
                   deId: caixa.activeList!.id,
                   deNome: caixa.activeList!.name,
-                  paraId: input.paraId,
-                  paraNome: input.paraNome,
+                  paraId: input.envelopeId,
+                  paraNome: input.envelopeNome,
                   amount: input.amount,
                 });
               }}
+              onReturn={async (input) => {
+                // Caminho inverso: o envelope é a origem e o caixa aberto o destino.
+                await caixa.devolver({
+                  deId: input.envelopeId,
+                  deNome: input.envelopeNome,
+                  paraId: caixa.activeList!.id,
+                  paraNome: caixa.activeList!.name,
+                  amount: input.amount,
+                });
+              }}
+              onDeleteEnvelope={caixa.removeList}
               onOpenEnvelope={handleSelectList}
               onBackToCaixa={() => {
                 const parentId = caixa.activeList?.parentId;

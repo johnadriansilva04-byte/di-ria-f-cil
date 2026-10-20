@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeftRight, Check, Layers, Loader2, Plus, X } from "lucide-react";
+import { Check, Layers, Loader2, Plus, Trash2, X } from "lucide-react";
 import { brl, brlCompact, errorMessage, toNumber, type Totals, type WalletList } from "@/lib/caixa";
 import { cn } from "@/lib/utils";
+import { AllocationBar } from "./AllocationBar";
 
 interface EnvelopesCardProps {
   /** Caixa aberto (lista raiz). O card só existe para raízes. */
@@ -10,9 +11,24 @@ interface EnvelopesCardProps {
   envelopes: WalletList[];
   summaries: Record<string, Totals>;
   onCreate: (name: string) => Promise<void>;
-  onDistribute: (input: { paraId: string; paraNome: string; amount: number }) => Promise<void>;
+  /** Envia valor do caixa para o envelope. */
+  onDistribute: (input: MovimentoEnvelope) => Promise<void>;
+  /** Traz o valor de um envelope de volta para o caixa (inverso de distribuir). */
+  onReturn: (input: MovimentoEnvelope) => Promise<void>;
+  /** Exclui o envelope e os lançamentos dele. */
+  onDelete: (id: string) => Promise<void>;
   onOpen: (id: string) => void;
 }
+
+/**
+ * Movimentação entre o caixa e um envelope. Só descreve o envelope; quem
+ * decide quem é origem e destino é a ação (`onDistribute` / `onReturn`).
+ */
+export type MovimentoEnvelope = {
+  envelopeId: string;
+  envelopeNome: string;
+  amount: number;
+};
 
 const inputClass =
   "min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 py-2 text-sm tabular-nums outline-none focus:border-ring focus:ring-1 focus:ring-ring/30";
@@ -28,11 +44,15 @@ export function EnvelopesCard({
   summaries,
   onCreate,
   onDistribute,
+  onReturn,
+  onDelete,
   onOpen,
 }: EnvelopesCardProps) {
   const [creating, setCreating] = useState(false);
   const [nome, setNome] = useState("");
-  const [distribuindoPara, setDistribuindoPara] = useState<string | null>(null);
+  const [movendoPara, setMovendoPara] = useState<string | null>(null);
+  const [direcao, setDirecao] = useState<"enviar" | "trazer">("enviar");
+  const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
   const [valor, setValor] = useState("");
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -42,8 +62,19 @@ export function EnvelopesCard({
     if (creating) nomeRef.current?.focus();
   }, [creating]);
 
-  const fecharDistribuicao = () => {
-    setDistribuindoPara(null);
+  const fecharMovimentacao = () => {
+    setMovendoPara(null);
+    setValor("");
+    setErro(null);
+  };
+
+  const abrirMovimentacao = (envId: string, dir: "enviar" | "trazer") => {
+    if (movendoPara === envId && direcao === dir) {
+      fecharMovimentacao();
+      return;
+    }
+    setMovendoPara(envId);
+    setDirecao(dir);
     setValor("");
     setErro(null);
   };
@@ -62,21 +93,48 @@ export function EnvelopesCard({
       .finally(() => setBusy(false));
   };
 
-  const distribuir = (paraId: string, paraNome: string) => {
+  const excluir = (envId: string) => {
+    setErro(null);
+    setBusy(true);
+    void onDelete(envId)
+      .then(() => setConfirmandoId(null))
+      .catch((e: unknown) => setErro(errorMessage(e, "Não foi possível excluir o envelope.")))
+      .finally(() => setBusy(false));
+  };
+
+  const mover = (envId: string, envNome: string, envSaldo: number) => {
     const amount = toNumber(valor);
     if (amount <= 0) {
       setErro("Informe um valor maior que zero.");
       return;
     }
-    if (amount > caixaSaldo) {
-      setErro(`O caixa tem ${brl(caixaSaldo)} — redistribua o valor.`);
+    // Enviar: o teto é o que ainda está livre no caixa. Trazer: o teto é o que
+    // o envelope tem de fato — não dá para devolver reserva que não existe.
+    const disponivel = direcao === "enviar" ? caixaSaldo : envSaldo;
+    if (amount > disponivel) {
+      setErro(
+        direcao === "enviar"
+          ? `O caixa tem ${brl(caixaSaldo)} livre — ajuste o valor.`
+          : `O envelope tem ${brl(envSaldo)} — ajuste o valor.`,
+      );
       return;
     }
     setErro(null);
     setBusy(true);
-    void onDistribute({ paraId, paraNome, amount })
-      .then(() => fecharDistribuicao())
-      .catch((e: unknown) => setErro(errorMessage(e, "Não foi possível distribuir.")))
+    const acao =
+      direcao === "enviar"
+        ? onDistribute({ envelopeId: envId, envelopeNome: envNome, amount })
+        : onReturn({ envelopeId: envId, envelopeNome: envNome, amount });
+    void acao
+      .then(() => fecharMovimentacao())
+      .catch((e: unknown) =>
+        setErro(
+          errorMessage(
+            e,
+            direcao === "enviar" ? "Não foi possível distribuir." : "Não foi possível devolver.",
+          ),
+        ),
+      )
       .finally(() => setBusy(false));
   };
 
@@ -148,89 +206,159 @@ export function EnvelopesCard({
         <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-border/70 px-4 py-6 text-center">
           <p className="text-sm text-muted-foreground">Nenhum envelope ainda.</p>
           <p className="text-xs text-muted-foreground/60">
-            Crie “Aluguel”, “Moto”, “Gasolina”… e mande dinheiro do caixa pra cada um.
+            Crie “Aluguel”, “Moto”, “Gasolina”… e mande dinheiro do caixa pra cada um. Depois use
+            “Trazer” pra devolver o que sobrou.
           </p>
         </div>
       ) : (
-        <ul className="space-y-2">
-          {envelopes.map((env) => {
-            const totais = summaries[env.id];
-            const saldo = totais?.balance ?? 0;
-            const aberto = distribuindoPara === env.id;
+        <>
+          <div className="mb-4">
+            <AllocationBar
+              envelopes={envelopes}
+              summaries={summaries}
+              caixaLivre={caixaSaldo}
+              onOpenEnvelope={onOpen}
+            />
+          </div>
+          <ul className="space-y-2">
+            {envelopes.map((env) => {
+              const totais = summaries[env.id];
+              const saldo = totais?.balance ?? 0;
+              const aberto = movendoPara === env.id;
+              const trazendo = aberto && direcao === "trazer";
 
-            return (
-              <li key={env.id} className="rounded-xl border border-border/60 bg-secondary/30 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onOpen(env.id)}
-                    className="min-w-0 flex-1 text-left"
-                    aria-label={`Abrir envelope ${env.name}`}
-                  >
-                    <span className="block truncate text-sm font-semibold hover:text-primary">
-                      {env.name}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] text-muted-foreground/70">
-                      {totais?.count ?? 0} {totais?.count === 1 ? "lançamento" : "lançamentos"}
-                    </span>
-                  </button>
-                  <span
-                    className={cn(
-                      "shrink-0 font-[family-name:var(--font-display)] text-sm font-bold tabular-nums",
-                      saldo < 0
-                        ? "text-expense"
-                        : saldo > 0
-                          ? "text-income"
-                          : "text-muted-foreground",
-                    )}
-                  >
-                    {brl(saldo)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => (aberto ? fecharDistribuicao() : setDistribuindoPara(env.id))}
-                    className="shrink-0 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/20"
-                  >
-                    Distribuir
-                  </button>
-                </div>
-
-                {saldo < 0 ? (
-                  <p className="mt-1.5 text-[10px] font-medium text-expense">
-                    Reserva estourada — faltou {brl(Math.abs(saldo))}
-                  </p>
-                ) : null}
-
-                {aberto ? (
-                  <div className="mt-2.5 flex items-center gap-1.5 border-t border-border/60 pt-2.5">
-                    <span className="text-xs text-muted-foreground">R$</span>
-                    <input
-                      autoFocus
-                      value={valor}
-                      onChange={(e) => setValor(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") distribuir(env.id, env.name);
-                        if (e.key === "Escape") fecharDistribuicao();
-                      }}
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      aria-label={`Valor a distribuir para ${env.name}`}
-                      className={inputClass}
-                    />
+              return (
+                <li key={env.id} className="rounded-xl border border-border/60 bg-secondary/30 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
                     <button
                       type="button"
-                      onClick={() => distribuir(env.id, env.name)}
-                      disabled={busy}
-                      className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                      onClick={() => onOpen(env.id)}
+                      className="min-w-0 flex-1 basis-40 text-left"
+                      aria-label={`Abrir envelope ${env.name}`}
                     >
-                      {busy ? <Loader2 className="size-3.5 animate-spin" /> : "Mandar"}
+                      <span className="block truncate text-sm font-semibold hover:text-primary">
+                        {env.name}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground/70">
+                        {totais?.count ?? 0} {totais?.count === 1 ? "lançamento" : "lançamentos"}
+                      </span>
                     </button>
+                    <span
+                      className={cn(
+                        "shrink-0 font-[family-name:var(--font-display)] text-sm font-bold tabular-nums",
+                        saldo < 0
+                          ? "text-expense"
+                          : saldo > 0
+                            ? "text-income"
+                            : "text-muted-foreground",
+                      )}
+                    >
+                      {brl(saldo)}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => abrirMovimentacao(env.id, "enviar")}
+                        className="rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/20"
+                      >
+                        Enviar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => abrirMovimentacao(env.id, "trazer")}
+                        disabled={saldo <= 0}
+                        title={saldo <= 0 ? "O envelope não tem saldo para trazer" : undefined}
+                        className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Trazer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmandoId(confirmandoId === env.id ? null : env.id)}
+                        disabled={busy}
+                        aria-label={`Excluir envelope ${env.name}`}
+                        title={`Excluir ${env.name}`}
+                        className="rounded-lg p-1.5 text-muted-foreground/50 transition-colors hover:bg-destructive/15 hover:text-destructive disabled:opacity-50"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
                   </div>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+
+                  {confirmandoId === env.id ? (
+                    <div className="mt-2 rounded-lg bg-destructive/10 px-3 py-2">
+                      <p className="text-xs text-destructive">
+                        Excluir “{env.name}” e {totais?.count ?? 0}{" "}
+                        {(totais?.count ?? 0) === 1 ? "lançamento" : "lançamentos"}?
+                      </p>
+                      <div className="mt-1.5 flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => excluir(env.id)}
+                          disabled={busy}
+                          className="rounded bg-destructive px-2 py-1 text-[11px] font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+                        >
+                          {busy ? <Loader2 className="size-3 animate-spin" /> : "Excluir"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmandoId(null)}
+                          className="rounded px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {saldo < 0 ? (
+                    <p className="mt-1.5 text-[10px] font-medium text-expense">
+                      Reserva estourada — faltou {brl(Math.abs(saldo))}
+                    </p>
+                  ) : null}
+
+                  {aberto ? (
+                    <div className="mt-2.5 flex items-center gap-1.5 border-t border-border/60 pt-2.5">
+                      <span className="text-xs text-muted-foreground">R$</span>
+                      <input
+                        autoFocus
+                        value={valor}
+                        onChange={(e) => setValor(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") mover(env.id, env.name, saldo);
+                          if (e.key === "Escape") fecharMovimentacao();
+                        }}
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        aria-label={
+                          trazendo
+                            ? `Valor a trazer de ${env.name}`
+                            : `Valor a enviar para ${env.name}`
+                        }
+                        className={inputClass}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => mover(env.id, env.name, saldo)}
+                        disabled={busy}
+                        aria-label={trazendo ? "Confirmar trazer" : "Confirmar envio"}
+                        className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                      >
+                        {busy ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : trazendo ? (
+                          "Trazer"
+                        ) : (
+                          "Mandar"
+                        )}
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
 
       {erro ? <p className="mt-2 text-[11px] font-medium text-destructive">{erro}</p> : null}
